@@ -154,6 +154,21 @@ td.num{white-space:nowrap}
 .cal{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 .bigday{font-family:var(--f-display);font-weight:800;font-size:3.4rem;line-height:1}
 select.tipsel{width:auto;min-height:40px;padding:6px 8px}
+.alert.news{border-color:var(--note);background:color-mix(in srgb,var(--note) 10%,var(--card))}
+.alert.sale{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 8%,var(--card))}
+s.muted{font-size:.85em}
+.msgs{display:grid;gap:20px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:820px){.msgs{grid-template-columns:minmax(0,320px) minmax(0,1fr)} .show-narrow{display:none!important}}
+@media (max-width:819px){.hide-narrow{display:none!important}}
+.convo{width:100%;background:none;border:0;border-top:1px solid var(--line);text-align:left;font:inherit;color:inherit;cursor:pointer;padding:11px 8px;border-radius:0}
+.convo.on{background:var(--paper);border-radius:10px}
+.convo .dot{min-width:22px;padding:0 6px;border-radius:999px;background:var(--coin);color:#1b1205;font-size:.75rem;line-height:22px;text-align:center;font-weight:700}
+.thread{display:flex;flex-direction:column;gap:8px;max-height:55vh;min-height:200px;overflow-y:auto;padding:4px}
+.bub{max-width:80%;align-self:flex-start;background:var(--paper);border:1px solid var(--line);border-radius:14px 14px 14px 4px;padding:8px 12px;display:grid;gap:2px;overflow-wrap:anywhere}
+.bub.mine{align-self:flex-end;background:var(--note);color:var(--note-ink);border-color:transparent;border-radius:14px 14px 4px 14px}
+.bub small{font-size:.72rem;opacity:.75}
+.compose{display:flex;gap:8px;grid-template-columns:none}
+.compose input{flex:1}
 </style>
 </head><body>
 <div id="app"><div class="center"><div><h2>Opening the bank…</h2><p class="muted">Counting the money.</p></div></div></div>
@@ -178,16 +193,33 @@ const app = document.getElementById('app');
 let db = null;
 const S = {
   dbState: 'loading', settings: undefined, settingsConfirmed: false,
-  players: {}, tx: [], shops: {}, items: {}, orders: [], loans: {}, bills: [],
+  players: {}, tx: [], shops: {}, items: {}, orders: [], loans: {}, bills: [], holdings: [], teller: [], cds: [], messages: [], thread: null,
   me: null, tab: null, modal: null, pin: null, toast: null, busy: false, err: null, slow: false,
 };
 const COLORS = ['#2F7D6B','#C0612B','#5B5BB5','#B0457A','#3C7FB0','#8A6D1F','#6C8A2E','#9C4BB3'];
-const DEFAULTS = {day: 1, payEvery: 3, billEvery: 4, billGrace: 2, interestEvery: 7, lateFee: 200, taxRate: 10, savingsRate: 2, loanRate: 5};
+const DEFAULTS = {day: 1, payEvery: 3, billEvery: 4, billGrace: 2, interestEvery: 7, lateFee: 200, taxRate: 10, savingsRate: 2, loanRate: 5,
+  rentEvery: 7, mortgageRate: 2, mortgageTerm: 10, downPct: 20, cdRate: 8, cdDays: 7, cdPenalty: 10, eventChance: 35};
 const DEFAULT_UTIL = [{name: 'Electric', amount: 800}, {name: 'Water', amount: 500}, {name: 'Internet', amount: 600}];
+const DEFAULT_HOMES = [{name: 'Apartment', rent: 1000, price: 15000}, {name: 'Townhouse', rent: 1600, price: 25000}, {name: 'House with a yard', rent: 2400, price: 40000}];
+const SHARES = 20;
 const BIZ = {
   shop: {noun: 'shop', Noun: 'Shop', list: 'Price list', item: 'Item', buy: 'Buy', done: 'Delivered', waiting: 'Waiting for delivery', ph: 'Lemonade Stand', php: 'Fresh lemonade and cookies', iph: 'Cookie'},
   restaurant: {noun: 'restaurant', Noun: 'Restaurant', list: 'Menu', item: 'Dish', buy: 'Order', done: 'Served', waiting: 'Waiting to be served', ph: 'The Hungry Moose Diner', php: 'Pancakes, burgers and milkshakes', iph: 'Cheeseburger'},
 };
+const EVENTS = [
+  {t: 'Town Fair', x: 'Everyone wins a {a} prize at the fair.', e: 'bonusAll', a: 500},
+  {t: 'Tax refund', x: 'The town had money left over. Everyone gets {a} back.', e: 'bonusAll', a: 300},
+  {t: 'Snowstorm', x: 'Heating costs went up. Everyone gets a {a} storm bill.', e: 'billAll', a: 400},
+  {t: 'Road repairs', x: 'The potholes got fixed. Everyone pays a {a} road fee.', e: 'billAll', a: 200},
+  {t: 'Stock market boom', x: 'Investors are excited. Share prices are up 25% today.', e: 'market', a: 25},
+  {t: 'Market dip', x: 'Investors got nervous. Share prices are down 20% today.', e: 'market', a: -20},
+  {t: 'Found money', x: '{p} found {a} on the sidewalk!', e: 'bonusOne', a: 1000},
+  {t: 'Lucky raffle', x: '{p} won the town raffle: {a}!', e: 'bonusOne', a: 1500},
+  {t: 'Lost wallet', x: 'Oh no! {p} lost a wallet with {a} inside.', e: 'takeOne', a: 500},
+  {t: 'Burst pipe', x: 'A pipe burst at {p}’s place. The repair bill is {a}.', e: 'billOne', a: 800},
+  {t: 'Bank birthday', x: 'The bank is celebrating. Savings earn double on the next interest day.', e: 'savings', a: 2},
+  {t: 'Holiday bonus', x: 'Everyone’s next paycheck gets a 20% holiday bonus.', e: 'payBonus', a: 20},
+];
 const bizType = s => (s && s.type === 'restaurant') ? 'restaurant' : 'shop';
 
 // ---------- utils ----------
@@ -208,8 +240,11 @@ const every = k => Math.max(1, Math.round(cfg(k)));
 const today = () => Math.max(1, Math.round(cfg('day')));
 const nextOn = k => { const n = every(k); return n * (Math.floor(today() / n) + 1); };
 const utilities = () => Array.isArray(S.settings?.utilities) ? S.settings.utilities.filter(u => u && u.name && u.amount > 0) : DEFAULT_UTIL;
+const homes = () => Array.isArray(S.settings?.homes) ? S.settings.homes.filter(h => h && h.name) : DEFAULT_HOMES;
 const billTotal = () => utilities().reduce((s, u) => s + u.amount, 0);
 const dayIn = d => d === today() ? 'today' : d === today() + 1 ? 'tomorrow' : 'Day ' + d;
+const pickRandom = a => a[Math.floor(Math.random() * a.length)];
+function mortgagePayment(P, ratePct, n) { const r = ratePct / 100; n = Math.max(1, n); return Math.ceil(r > 0 ? P * r / (1 - Math.pow(1 + r, -n)) : P / n); }
 
 function nameOf(pid) { return pid === 'bank' ? 'Town Bank' : (S.players[pid]?.name || 'Former resident'); }
 function balances() {
@@ -225,6 +260,74 @@ const playerList = () => Object.values(S.players).sort((a, b) => (a.createdAt ||
 const loansOf = pid => Object.values(S.loans).filter(l => l.playerId === pid).sort((a, b) => b.at - a.at);
 const billsOf = pid => S.bills.filter(b => b.playerId === pid);
 const openBills = pid => billsOf(pid).filter(b => b.status === 'due' || b.status === 'late');
+const cdsOf = pid => S.cds.filter(c => c.playerId === pid);
+const tellerOf = pid => S.teller.filter(t => t.playerId === pid);
+const waitingTeller = () => S.teller.filter(t => t.status === 'waiting');
+// messages
+const readMap = () => { try { return JSON.parse(ls('ptb.read.' + S.me) || '{}') || {}; } catch (e) { return {}; } };
+const markRead = key => { const m = readMap(); m[key] = Date.now(); ls('ptb.read.' + S.me, JSON.stringify(m)); };
+const contactName = k => k === 'board' ? 'Town bulletin board' : k === 'bank' ? 'The Banker' : nameOf(k);
+const contacts = () => ['board', ...(S.me === 'bank' ? [] : ['bank']), ...playerList().map(p => p.id).filter(id => id !== S.me)];
+function threadMsgs(key) {
+  const me = S.me;
+  return S.messages.filter(m => key === 'board' ? m.to === 'board' : ((m.from === me && m.to === key) || (m.from === key && m.to === me))).sort((a, b) => a.at - b.at);
+}
+const unreadIn = (key, r = readMap()) => threadMsgs(key).filter(m => m.from !== S.me && m.at > (r[key] || 0)).length;
+const unreadTotal = () => { const r = readMap(); return contacts().reduce((s, k) => s + unreadIn(k, r), 0); };
+function messagesView() {
+  const cs = contacts(), cur = S.thread && cs.includes(S.thread) ? S.thread : null, r = readMap();
+  const av = k => k === 'board' ? '<span class="badge">TB</span>' : k === 'bank' ? '<span class="badge" style="background:var(--ink);color:var(--paper);border:0">$</span>' : `<span class="badge" style="background:${color(k)};color:#fff;border:0">${initial(nameOf(k))}</span>`;
+  const list = `<section class="panel ${cur ? 'hide-narrow' : ''}"><h3>Conversations</h3><div class="list">${cs.map(k => {
+    const ms = threadMsgs(k), last = ms[ms.length - 1], u = unreadIn(k, r);
+    return `<button class="li convo ${cur === k ? 'on' : ''}" data-act="openThread" data-id="${k}">${av(k)}<div class="main"><b>${esc(contactName(k))}</b><small>${last ? esc(((last.from === S.me ? 'You: ' : (k === 'board' ? contactName(last.from) + ': ' : '')) + last.text).slice(0, 70)) : (k === 'board' ? 'Announcements and ads for everyone' : 'No messages yet')}</small></div>${u ? `<span class="dot">${u}</span>` : ''}</button>`;
+  }).join('')}</div></section>`;
+  const msgs = cur ? threadMsgs(cur).slice(-150) : [];
+  const bubble = m => `<div class="bub ${m.from === S.me ? 'mine' : ''}">${cur === 'board' && m.from !== S.me ? `<b>${esc(contactName(m.from))}</b>` : ''}<span>${esc(m.text)}</span><small>Day ${m.day || '?'} · ${new Date(m.at).toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'})}</small></div>`;
+  const thread = `<section class="panel ${cur ? '' : 'hide-narrow'}">${cur ? `<div class="panel-head"><div class="row"><button class="btn ghost sm show-narrow" data-act="closeThread">← Back</button><h3>${esc(contactName(cur))}</h3></div>${cur === 'board' ? '<span class="muted" style="font-size:.85rem">Everyone in town sees these</span>' : ''}</div>
+    <div id="thread" class="thread">${msgs.length ? msgs.map(bubble).join('') : `<div class="empty">${cur === 'board' ? 'Post the first announcement or ad.' : 'Say hi to ' + esc(contactName(cur)) + '.'}</div>`}</div>
+    <form class="compose" data-form="sendMsg" data-id="${cur}"><input id="msg-text" maxlength="300" required autocomplete="off" placeholder="${cur === 'board' ? 'Post to the whole town…' : 'Message ' + esc(contactName(cur)) + '…'}" aria-label="Message"><button class="btn">${cur === 'board' ? 'Post' : 'Send'}</button></form>`
+    : '<div class="empty">Pick a conversation.</div>'}</section>`;
+  let log = '';
+  if (S.me === 'bank') {
+    const dms = S.messages.filter(m => m.to !== 'board' && m.to !== 'bank' && m.from !== 'bank').sort((a, b) => b.at - a.at).slice(0, 40);
+    log = `<section class="panel"><h3>All private messages</h3><p class="muted" style="font-size:.85rem">Messages between residents. Only you see this list.</p><div class="list">${dms.length ? dms.map(m => `<div class="li"><div class="main"><b>${esc(contactName(m.from))} → ${esc(contactName(m.to))}</b><small>${esc(m.text)} · Day ${m.day || '?'}</small></div></div>`).join('') : '<div class="empty">No private messages yet.</div>'}</div></section>`;
+  }
+  return `<div class="msgs">${list}${thread}</div>${log}`;
+}
+
+// sales & stocks
+const salePct = shop => (shop && shop.sale && shop.sale.pct > 0 && today() <= shop.sale.untilDay) ? shop.sale.pct : 0;
+const priceNow = (item, shop) => Math.round(item.price * (100 - salePct(shop)) / 100);
+const saleWhen = shop => shop.sale.untilDay === today() ? 'today only' : 'through Day ' + shop.sale.untilDay;
+function revenue(shopId, endDay) {
+  return S.orders.filter(o => o.shopId === shopId && o.status !== 'refunded' && (o.day || 1) > endDay - 7 && (o.day || 1) <= endDay).reduce((s, o) => s + o.total, 0);
+}
+function sharePrice(shopId, day = today()) {
+  let p = Math.round((10000 + 4 * revenue(shopId, day)) / SHARES);
+  const ev = S.settings?.event;
+  if (ev && ev.effect === 'market' && day >= ev.day && day <= (ev.untilDay ?? ev.day)) p = Math.round(p * (100 + ev.value) / 100);
+  return Math.max(100, p);
+}
+const sharesOut = shopId => S.holdings.filter(h => h.shopId === shopId).reduce((s, h) => s + (h.shares || 0), 0);
+const holdingsOf = pid => S.holdings.filter(h => h.playerId === pid && h.shares > 0);
+function spark(shopId) {
+  const days = []; for (let d = Math.max(1, today() - 7); d <= today(); d++) days.push(sharePrice(shopId, d));
+  if (days.length < 2) days.unshift(days[0]);
+  const min = Math.min(...days), max = Math.max(...days), span = max - min || 1;
+  const pts = days.map((v, i) => `${(i / (days.length - 1) * 76 + 2).toFixed(1)},${(22 - (v - min) / span * 18).toFixed(1)}`).join(' ');
+  const up = days[days.length - 1] >= days[0];
+  return `<svg viewBox="0 0 80 26" width="80" height="26" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="var(--${up ? 'good' : 'bad'})" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+
+function netWorth(pid, b) {
+  const p = S.players[pid] || {};
+  let w = bal(b, pid, 'c') + bal(b, pid, 's');
+  w += cdsOf(pid).filter(c => c.status === 'open').reduce((s, c) => s + c.amount, 0);
+  w += holdingsOf(pid).reduce((s, h) => s + h.shares * sharePrice(h.shopId), 0);
+  if (p.home && p.home.mode !== 'rent') w += p.home.price - (p.home.mode === 'mortgage' ? (p.home.balance || 0) : 0);
+  w -= loansOf(pid).filter(l => l.status === 'active').reduce((s, l) => s + l.balance, 0);
+  return w;
+}
 
 function credit(pid) {
   const p = S.players[pid] || {};
@@ -255,7 +358,7 @@ function gauge(score, cls) {
     <text x="108" y="67" font-size="7" fill="var(--muted)" text-anchor="middle">850</text></svg>`;
 }
 
-const KIND = {pay:'Paycheck', check:'Check', move:'Savings transfer', purchase:'Purchase', meal:'Restaurant', refund:'Refund', loan:'Loan', repay:'Loan payment', interest:'Interest', adjust:'From the bank', bill:'Utility bill'};
+const KIND = {pay:'Paycheck', check:'Check', move:'Savings transfer', purchase:'Purchase', meal:'Restaurant', refund:'Refund', loan:'Loan', repay:'Loan payment', interest:'Interest', adjust:'From the bank', bill:'Bill', rent:'Rent', home:'Home', stock:'Stocks', cash:'Cash', cd:'CD', event:'Town event'};
 function txRows(list, pid, limit = 15) {
   const rows = list.slice(0, limit).map(t => {
     let delta = null; const title = t.memo || KIND[t.kind] || 'Transaction';
@@ -279,7 +382,11 @@ const myTx = pid => S.tx.filter(t => t.from.startsWith(pid + '.') || t.to.starts
 async function addTx(from, to, amount, kind, memo, extra = {}) {
   await db.collection('tx').add({from, to, amount, kind, memo, at: Date.now(), day: today(), ...extra});
 }
-function toast(msg, err) { S.toast = {msg, err}; clearTimeout(toast.t); toast.t = setTimeout(() => { S.toast = null; render(); }, 3200); render(); }
+async function addBill(playerId, kind, label, items, day, extra = {}) {
+  const total = items.reduce((s, u) => s + u.amount, 0); if (total <= 0) return;
+  await db.collection('bills').add({playerId, kind, label, items, total, issuedDay: day, dueDay: day + Math.max(0, Math.round(cfg('billGrace'))), status: 'due', at: Date.now(), ...extra});
+}
+function toast(msg, err) { S.toast = {msg, err}; clearTimeout(toast.t); toast.t = setTimeout(() => { S.toast = null; render(); }, 3600); render(); }
 async function run(fn) {
   if (S.busy) return;
   S.busy = true;
@@ -287,7 +394,7 @@ async function run(fn) {
   catch (e) {
     console.error(e);
     toast(e.userMsg || (e.code === 'resource-exhausted' ? 'The bank hit today’s free limit. It will work again tomorrow.'
-      : e.code === 'permission-denied' ? 'The database refused that change. Check the Firestore rules.'
+      : e.code === 'permission-denied' ? 'The database refused that change. Check the Firestore rules include every collection.'
       : 'That didn’t save. Check the Wi-Fi and try again.'), true);
   } finally { S.busy = false; render(); }
 }
@@ -297,30 +404,68 @@ const clear = (...ids) => ids.forEach(i => clearIds.add(i));
 // Scheduled town events. Each returns a short summary or '' and may add to the settings patch.
 async function doPayday(patch) {
   const ps = playerList().filter(p => (p.wage || 0) > 0); if (!ps.length) return '';
-  const tr = cfg('taxRate');
-  for (const p of ps) { const tax = Math.round(p.wage * tr / 100); await addTx('bank', p.id + '.c', p.wage - tax, 'pay', `Paycheck: ${p.job || 'Wages'} (${money(p.wage)} gross, ${money(tax)} tax)`, {gross: p.wage, tax}); }
-  patch.lastPayday = Date.now(); patch.paydays = (S.settings.paydays || 0) + 1;
+  const tr = cfg('taxRate'), bonus = Number(S.settings.payBonus || 0);
+  for (const p of ps) {
+    const gross = Math.round(p.wage * (100 + bonus) / 100), tax = Math.round(gross * tr / 100);
+    await addTx('bank', p.id + '.c', gross - tax, 'pay', `Paycheck: ${p.job || 'Wages'} (${money(gross)} gross${bonus ? ' with ' + bonus + '% bonus' : ''}, ${money(tax)} tax)`, {gross, tax});
+  }
+  patch.lastPayday = Date.now(); patch.paydays = (S.settings.paydays || 0) + 1; if (bonus) patch.payBonus = 0;
   return `${ps.length} paycheck${ps.length > 1 ? 's' : ''}`;
 }
 async function doInterest(patch) {
-  const b = balances(), sr = cfg('savingsRate'); let n = 0;
+  const b = balances(), boost = Number(S.settings.savingsBoost || 1) || 1, sr = cfg('savingsRate') * boost;
   for (const l of Object.values(S.loans).filter(l => l.status === 'active')) {
-    const i = Math.round(l.balance * l.rate / 100); if (i > 0) { await db.doc('loans/' + l.id).update({balance: l.balance + i, interest: (l.interest || 0) + i}); n++; }
+    const i = Math.round(l.balance * l.rate / 100); if (i > 0) await db.doc('loans/' + l.id).update({balance: l.balance + i, interest: (l.interest || 0) + i});
   }
-  for (const p of playerList()) { const i = Math.round(bal(b, p.id, 's') * sr / 100); if (i > 0) { await addTx('bank', p.id + '.s', i, 'interest', `Savings interest at ${sr}%`); n++; } }
-  patch.lastInterest = Date.now();
+  for (const p of playerList()) { const i = Math.round(bal(b, p.id, 's') * sr / 100); if (i > 0) await addTx('bank', p.id + '.s', i, 'interest', `Savings interest at ${sr}%`); }
+  patch.lastInterest = Date.now(); if (boost !== 1) patch.savingsBoost = 1;
   return 'interest';
 }
-async function doBills(day) {
-  const items = utilities(), total = items.reduce((s, u) => s + u.amount, 0); if (!total) return '';
+async function doUtilities(day) {
+  const items = utilities(); if (!items.length) return '';
   const ps = playerList();
-  for (const p of ps) await db.collection('bills').add({playerId: p.id, items, total, issuedDay: day, dueDay: day + Math.max(0, Math.round(cfg('billGrace'))), status: 'due', at: Date.now()});
+  for (const p of ps) await addBill(p.id, 'utility', 'Utilities', items, day);
   return ps.length ? 'utility bills' : '';
+}
+async function doHousing(day) {
+  let n = 0;
+  for (const p of playerList()) {
+    const h = p.home; if (!h) continue;
+    if (h.mode === 'rent') { await addBill(p.id, 'rent', 'Rent', [{name: 'Rent · ' + h.name, amount: h.rent}], day); n++; }
+    if (h.mode === 'mortgage' && h.balance > 0) {
+      const due = Math.min(h.payment, h.balance + Math.round(h.balance * h.rate / 100));
+      await addBill(p.id, 'mortgage', 'Mortgage', [{name: 'Mortgage · ' + h.name, amount: due}], day, {base: due}); n++;
+    }
+  }
+  return n ? 'rent & mortgages' : '';
+}
+async function doCds(day) {
+  let n = 0;
+  for (const c of S.cds.filter(c => c.status === 'open' && c.matureDay <= day)) {
+    await addTx('bank', c.playerId + '.c', c.payout, 'cd', `CD matured: ${money(c.amount)} + ${money(c.payout - c.amount)} interest`);
+    await db.doc('cds/' + c.id).update({status: 'matured'}); n++;
+  }
+  return n ? `${n} CD${n > 1 ? 's' : ''} matured` : '';
 }
 async function markLate(day) {
   const fee = Math.max(0, Math.round(cfg('lateFee'))); let n = 0;
   for (const b of S.bills.filter(b => b.status === 'due' && b.dueDay < day)) { await db.doc('bills/' + b.id).update({status: 'late', lateFee: fee, total: b.total + fee}); n++; }
   return n ? `${n} late bill${n > 1 ? 's' : ''}` : '';
+}
+async function drawEvent(day, patch) {
+  const ps = playerList(); if (!ps.length) return '';
+  const ev = pickRandom(EVENTS), p = pickRandom(ps);
+  const text = ev.x.replace('{a}', money(ev.a)).replace('{p}', p.name);
+  if (ev.e === 'bonusAll') for (const q of ps) await addTx('bank', q.id + '.c', ev.a, 'event', ev.t);
+  if (ev.e === 'billAll') for (const q of ps) await addBill(q.id, 'event', ev.t, [{name: ev.t, amount: ev.a}], day);
+  if (ev.e === 'bonusOne') await addTx('bank', p.id + '.c', ev.a, 'event', ev.t);
+  if (ev.e === 'takeOne') await addTx(p.id + '.c', 'bank', ev.a, 'event', ev.t);
+  if (ev.e === 'billOne') await addBill(p.id, 'event', ev.t, [{name: ev.t, amount: ev.a}], day);
+  if (ev.e === 'savings') patch.savingsBoost = ev.a;
+  if (ev.e === 'payBonus') patch.payBonus = ev.a;
+  patch.event = {title: ev.t, text, day, untilDay: day, effect: ev.e, value: ev.a};
+  patch.news = [{day, title: ev.t, text}, ...(S.settings.news || [])].slice(0, 12);
+  return 'town news: ' + ev.t;
 }
 
 // ---------- render ----------
@@ -331,7 +476,9 @@ function render() {
   app.querySelectorAll('input[id],select[id],textarea[id]').forEach(el => saved[el.id] = el.value);
   const focusId = ae && ae.id && app.contains(ae) ? ae.id : null;
   let sel = null; try { sel = focusId ? [ae.selectionStart, ae.selectionEnd] : null; } catch (e) {}
+  if (S.tab === 'messages' && S.thread && S.me) markRead(S.thread);
   app.innerHTML = view();
+  const th = document.getElementById('thread'); if (th) th.scrollTop = th.scrollHeight;
   for (const [id, v] of Object.entries(saved)) {
     if (clearIds.has(id)) continue;
     const el = document.getElementById(id); if (el && el.type !== 'hidden') el.value = v;
@@ -343,7 +490,7 @@ function render() {
 function view() {
   let body;
   if (S.dbState === 'none') body = center('The bank isn’t connected yet', 'The Firebase settings haven’t been added to this app. Paste them into FIREBASE_CONFIG near the top of index.html.');
-  else if (S.err) body = center('The bank is closed right now', S.err === 'permission-denied' ? 'The database refused access. Check the Firestore rules in the Firebase console.' : 'Something stopped the bank from loading. Close and reopen this page.');
+  else if (S.err) body = center('The bank is closed right now', S.err === 'permission-denied' ? 'The database refused access. Check that the Firestore rules list every collection.' : 'Something stopped the bank from loading. Close and reopen this page.');
   else if (S.settings === undefined || (S.settings === null && !S.settingsConfirmed))
     body = center('Opening the bank…', S.slow ? 'The bank can’t be reached yet. Check the Wi-Fi; it will open as soon as it connects.' : 'Counting the money.');
   else if (S.settings === null) body = viewSetup();
@@ -353,11 +500,15 @@ function view() {
   return body + viewModal() + (S.toast ? `<div class="toast ${S.toast.err ? 'err' : ''}" role="status">${esc(S.toast.msg)}</div>` : '');
 }
 const center = (h, p) => `<div class="center"><div style="display:grid;gap:8px;max-width:420px"><h2>${esc(h)}</h2><p class="muted">${esc(p)}</p></div></div>`;
+function newsBanner() {
+  const ev = S.settings?.event; if (!ev || today() > (ev.untilDay ?? ev.day)) return '';
+  return `<div class="alert news"><span><b>Town news · ${esc(ev.title)}</b><br>${esc(ev.text)}</span></div>`;
+}
 
 function viewSetup() {
   return `<div class="pick" style="padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))"><div style="display:grid;gap:10px">
     <p class="eyebrow">Open a new bank</p><h1>Let’s found your town</h1>
-    <p class="muted" style="max-width:60ch">You’ll be the banker. You advance the days, run payday, send utility bills, approve loans and set the rules. Each kid gets checking and savings, a job, a credit score, and can open a shop and a restaurant.</p></div>
+    <p class="muted" style="max-width:60ch">You’ll be the banker. You advance the days, run payday, approve loans and mortgages, and work the teller window. Each kid gets accounts, a job, a home, a credit score, and can run a shop and a restaurant.</p></div>
     <form class="panel" data-form="setup">
       <div class="fields">
         <label>Town name<input id="su-name" required maxlength="40" placeholder="Maple Creek"></label>
@@ -375,6 +526,7 @@ function viewPick() {
       <span class="av" style="background:${color(p.id)}">${initial(p.name)}</span>${esc(p.name)}<small>${esc(p.job || 'No job yet')}</small></button>`).join('');
   return `<div class="pick" style="padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))">
     <div style="display:grid;gap:6px"><p class="eyebrow">Welcome to · Day ${today()}</p><h1>${esc(S.settings.name)}</h1><p class="muted">Tap your name to open your accounts.</p></div>
+    ${newsBanner()}
     <div class="people">${tiles}
       <button class="person bank" data-act="pickBank"><span class="av">$</span>Banker<small>Grown-ups only</small></button></div>
     ${ps.length ? '' : '<div class="empty">No residents yet. The banker adds them under Residents.</div>'}
@@ -383,9 +535,11 @@ function viewPick() {
 
 function shell(isBank) {
   const myOrders = S.orders.filter(o => o.sellerId === S.me && o.status === 'new').length;
+  const bankQueue = waitingTeller().length + Object.values(S.loans).filter(l => l.status === 'requested').length;
+  const myWaiting = tellerOf(S.me).filter(t => t.status === 'waiting').length + loansOf(S.me).filter(l => l.status === 'requested').length;
   const tabs = isBank
-    ? [['town','Town'],['calendar','Day & schedule'],['loans','Loans', Object.values(S.loans).filter(l => l.status === 'requested').length],['people','Residents'],['shops','Businesses'],['settings','Settings']]
-    : [['home','Accounts'],['bills','Bills', openBills(S.me).length],['pay','Write a check'],['shop','Main Street'],['myshop','My businesses', myOrders],['loans','Credit & loans']];
+    ? [['town','Town'],['calendar','Day & schedule'],['teller','Teller window', bankQueue],['messages','Messages', unreadTotal()],['people','Residents'],['shops','Businesses'],['settings','Settings']]
+    : [['home','Accounts'],['messages','Messages', unreadTotal()],['bills','Bills', openBills(S.me).length],['housing','Housing'],['pay','Write a check'],['shop','Main Street'],['myshop','My businesses', myOrders],['stocks','Stocks'],['bank','Bank & credit', myWaiting]];
   if (!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
   const who = isBank ? 'Banker mode' : nameOf(S.me) + (S.players[S.me]?.job ? ' · ' + S.players[S.me].job : '');
   const content = isBank ? bankView() : playerView();
@@ -398,10 +552,10 @@ function shell(isBank) {
 }
 
 // ---------- player views ----------
-function billCard(b, pid, canPay) {
+function billCard(b, canPay) {
   const late = b.status === 'late', paid = b.status === 'paid' || b.status === 'paidLate';
   const pill = paid ? (b.status === 'paidLate' ? ['Paid late', 'warn'] : ['Paid on time', 'good']) : late ? ['Late', 'bad'] : (b.dueDay === today() ? ['Due today', 'warn'] : ['Due ' + dayIn(b.dueDay), 'note']);
-  return `<div class="shop"><div class="panel-head"><b>Utilities · Day ${b.issuedDay}</b><span class="pill ${pill[1]}">${pill[0]}</span></div>
+  return `<div class="shop"><div class="panel-head"><b>${esc(b.label || 'Utilities')} · Day ${b.issuedDay}</b><span class="pill ${pill[1]}">${pill[0]}</span></div>
     <div class="list">${b.items.map(u => `<div class="li" style="padding:6px 0"><div class="main">${esc(u.name)}</div><span class="amt">${money(u.amount)}</span></div>`).join('')}
     ${b.lateFee ? `<div class="li" style="padding:6px 0"><div class="main neg">Late fee</div><span class="amt neg">${money(b.lateFee)}</span></div>` : ''}
     <div class="li" style="padding:6px 0"><div class="main"><b>Total</b></div><span class="amt"><b>${money(b.total)}</b></span></div></div>
@@ -409,25 +563,33 @@ function billCard(b, pid, canPay) {
 }
 
 function playerView() {
+  if (S.tab === 'messages') return messagesView();
   const pid = S.me, p = S.players[pid], b = balances();
   if (S.tab === 'home') {
     const cr = credit(pid), ob = openBills(pid);
     const pendingOrders = S.orders.filter(o => o.buyerId === pid && o.status === 'new');
+    const cdTotal = cdsOf(pid).filter(c => c.status === 'open').reduce((s, c) => s + c.amount, 0);
+    const stockVal = holdingsOf(pid).reduce((s, h) => s + h.shares * sharePrice(h.shopId), 0);
     return `<div style="display:grid;gap:4px"><p class="eyebrow">Your accounts · Day ${today()}</p><h2>Hi, ${esc(p.name)}</h2></div>
+    ${newsBanner()}
     ${ob.length ? `<div class="alert ${ob.some(x => x.status === 'late') ? 'bad' : ''}"><span><b>${ob.length} bill${ob.length > 1 ? 's' : ''} to pay</b> · ${money(ob.reduce((s, x) => s + x.total, 0))}${ob.some(x => x.status === 'late') ? ' · late fees added' : ''}</span><button class="btn sm" data-act="tab" data-id="bills">See bills</button></div>` : ''}
+    ${!p.home ? `<div class="alert"><span><b>You don’t have a place to live yet.</b> Rent or buy a home.</span><button class="btn sm" data-act="tab" data-id="housing">Find a home</button></div>` : ''}
     <div class="accts">
       <div class="acct"><div class="k"><span>Checking</span><span class="num">•• ${acctNo(pid + 'c')}</span></div>
         <div class="v">${money(bal(b, pid, 'c'))}</div><div class="s">For spending, checks, bills and shopping</div></div>
       <div class="acct sav"><div class="k"><span>Savings</span><span class="num">•• ${acctNo(pid + 's')}</span></div>
         <div class="v">${money(bal(b, pid, 's'))}</div><div class="s">Earns ${cfg('savingsRate')}% every ${every('interestEvery')} days</div></div>
     </div>
+    <div class="stats"><div class="stat"><b>${money(netWorth(pid, b))}</b><span>Net worth (everything you own minus what you owe)</span></div>
+      <div class="stat"><b>${money(cdTotal)}</b><span>In CDs</span></div><div class="stat"><b>${money(stockVal)}</b><span>In stocks</span></div></div>
     <div class="cols"><div class="stack">
       <section class="panel"><div class="panel-head"><h3>Recent activity</h3><span class="muted" style="font-size:.85rem">${myTx(pid).length} total</span></div>
         <div class="list">${txRows(myTx(pid), pid, 20)}</div></section>
     </div><div class="stack">
       <section class="panel"><h3>Coming up</h3><div class="list">
-        <div class="li"><span class="badge">PAY</span><div class="main"><b>Payday</b><small>Every ${every('payEvery')} days</small></div><span class="amt">${dayIn(nextOn('payEvery'))}</span></div>
+        <div class="li"><span class="badge">PAY</span><div class="main"><b>Payday</b><small>Every ${every('payEvery')} days${S.settings.payBonus ? ' · ' + S.settings.payBonus + '% bonus coming' : ''}</small></div><span class="amt">${dayIn(nextOn('payEvery'))}</span></div>
         <div class="li"><span class="badge">BIL</span><div class="main"><b>Utility bills arrive</b><small>Every ${every('billEvery')} days · about ${money(billTotal())}</small></div><span class="amt">${dayIn(nextOn('billEvery'))}</span></div>
+        ${p.home && p.home.mode !== 'own' ? `<div class="li"><span class="badge">HOM</span><div class="main"><b>${p.home.mode === 'rent' ? 'Rent' : 'Mortgage'} bill</b><small>${esc(p.home.name)}</small></div><span class="amt">${dayIn(nextOn('rentEvery'))}</span></div>` : ''}
         <div class="li"><span class="badge">INT</span><div class="main"><b>Interest day</b><small>Savings earn, loans grow</small></div><span class="amt">${dayIn(nextOn('interestEvery'))}</span></div></div></section>
       <section class="panel"><h3>Move money</h3>
         <form data-form="move">
@@ -437,8 +599,8 @@ function playerView() {
       <section class="panel"><div class="panel-head"><h3>Your job</h3><span class="pill note">${esc(p.job || 'Unassigned')}</span></div>
         <p>Paycheck: <b class="num">${money(p.wage || 0)}</b> before ${cfg('taxRate')}% town tax, so <b class="num">${money((p.wage || 0) - Math.round((p.wage || 0) * cfg('taxRate') / 100))}</b> lands in checking each payday.</p></section>
       <section class="panel"><div class="gauge-wrap">${gauge(cr.score, cr.band[1])}<div><p class="eyebrow">Credit score</p><div class="score num">${cr.score}</div><span class="pill ${cr.band[1]}">${cr.band[0]}</span></div></div>
-        <button class="btn ghost sm" data-act="tab" data-id="loans">See credit & loans</button></section>
-      ${pendingOrders.length ? `<section class="panel"><h3>On the way</h3><div class="list">${pendingOrders.map(o => `<div class="li"><div class="main"><b>${o.qty} × ${esc(o.itemName)}</b><small>${BIZ[bizType(S.shops[o.shopId] || {type: o.bizType})].waiting} · ${esc(S.shops[o.shopId]?.name || 'a business')}</small></div><span class="amt">${money(o.total)}</span></div>`).join('')}</div></section>` : ''}
+        <button class="btn ghost sm" data-act="tab" data-id="bank">See bank & credit</button></section>
+      ${pendingOrders.length ? `<section class="panel"><h3>On the way</h3><div class="list">${pendingOrders.map(o => `<div class="li"><div class="main"><b>${o.qty} × ${esc(o.itemName)}</b><small>${BIZ[o.bizType === 'restaurant' ? 'restaurant' : 'shop'].waiting} · ${esc(S.shops[o.shopId]?.name || 'a business')}</small></div><span class="amt">${money(o.total)}</span></div>`).join('')}</div></section>` : ''}
     </div></div>`;
   }
   if (S.tab === 'bills') {
@@ -446,13 +608,39 @@ function playerView() {
     const past = billsOf(pid).filter(x => x.status === 'paid' || x.status === 'paidLate').sort((a, c) => c.issuedDay - a.issuedDay);
     return `<div class="cols"><div class="stack">
       <div><p class="eyebrow">Day ${today()}</p><h2>Bills to pay</h2></div>
-      ${ob.length ? ob.map(x => billCard(x, pid, true)).join('') : '<div class="empty">All paid up. Nice work.</div>'}
+      ${ob.length ? ob.map(x => billCard(x, true)).join('') : '<div class="empty">All paid up. Nice work.</div>'}
       <p class="muted" style="font-size:.9rem">You have <b class="num">${money(bal(b, pid, 'c'))}</b> in checking.</p>
     </div><div class="stack">
-      <section class="panel"><h3>How bills work</h3><p class="muted">Utility bills arrive every ${every('billEvery')} days. You have ${Math.round(cfg('billGrace'))} days to pay. A late bill gets a ${money(cfg('lateFee'))} fee and lowers your credit score by 30 points. Bills paid on time raise it.</p>
-        <p>Next bills arrive <b>${dayIn(nextOn('billEvery'))}</b>.</p></section>
-      <section class="panel"><h3>Paid bills</h3>${past.length ? past.slice(0, 12).map(x => billCard(x, pid, false)).join('') : '<div class="empty">No paid bills yet.</div>'}</section>
+      <section class="panel"><h3>How bills work</h3><p class="muted">Utility bills arrive every ${every('billEvery')} days. Rent and mortgage bills arrive every ${every('rentEvery')} days. Town events can send surprise bills too. You have ${Math.round(cfg('billGrace'))} days to pay each one. A late bill gets a ${money(cfg('lateFee'))} fee and lowers your credit score by 30 points. Bills paid on time raise it.</p></section>
+      <section class="panel"><h3>Paid bills</h3>${past.length ? past.slice(0, 12).map(x => billCard(x, false)).join('') : '<div class="empty">No paid bills yet.</div>'}</section>
     </div></div>`;
+  }
+  if (S.tab === 'housing') {
+    const h = p.home, cr = credit(pid), pendingM = tellerOf(pid).find(t => t.kind === 'mortgage' && t.status === 'waiting');
+    const homeCard = h ? `<section class="panel"><div class="panel-head"><div><p class="eyebrow">Where you live</p><h2>${esc(h.name)}</h2></div>
+        <span class="pill ${h.mode === 'own' ? 'good' : 'note'}">${h.mode === 'rent' ? 'Renting' : h.mode === 'mortgage' ? 'Buying with a mortgage' : 'You own it'}</span></div>
+      ${h.mode === 'rent' ? `<p>Rent is <b class="num">${money(h.rent)}</b> every ${every('rentEvery')} days. Next rent bill: <b>${dayIn(nextOn('rentEvery'))}</b>.</p><p class="muted">Renters build no ownership. Save up a down payment to buy instead.</p>` : ''}
+      ${h.mode === 'mortgage' ? `<div class="stats"><div class="stat"><b>${money(h.balance)}</b><span>Still owed</span></div><div class="stat"><b>${money(h.payment)}</b><span>Payment every ${every('rentEvery')} days</span></div><div class="stat"><b>${money(h.price - h.balance)}</b><span>Your equity (the part you own)</span></div></div>
+        <p class="muted">${h.rate}% interest each period. Every payment pays the interest first, then shrinks what you owe.</p>
+        <form class="inline" data-form="extraPrincipal"><label>Pay extra toward the mortgage<input id="xp-amt" inputmode="decimal" placeholder="0.00" required></label><button class="btn gold">Pay extra</button></form>` : ''}
+      ${h.mode === 'own' ? `<p>No more rent or mortgage. This home is worth <b class="num">${money(h.price)}</b> and counts toward your net worth.</p>` : ''}
+      <div><button class="btn danger sm" data-act="moveOut">${h.mode === 'rent' ? 'Move out' : 'Sell and move out'}</button></div></section>` : '';
+    const list = homes().map((x, i) => {
+      const down = Math.round(x.price * cfg('downPct') / 100), pay = mortgagePayment(x.price - down, cfg('mortgageRate'), every('mortgageTerm'));
+      return `<section class="shop"><div class="panel-head"><h3>${esc(x.name)}</h3><span class="muted num">${money(x.price)}</span></div>
+        <div class="stats"><div class="stat"><b>${money(x.rent)}</b><span>Rent every ${every('rentEvery')} days</span></div><div class="stat"><b>${money(down)}</b><span>Down payment to buy (${cfg('downPct')}%)</span></div><div class="stat"><b>${money(pay)}</b><span>Mortgage payment for ${every('mortgageTerm')} periods</span></div></div>
+        ${h ? '' : `<div class="row"><button class="btn sm" data-act="rentHome" data-id="${i}">Rent it (${money(x.rent)} to move in)</button>
+          <button class="btn gold sm" data-act="applyMortgage" data-id="${i}" ${pendingM ? 'disabled' : ''}>Apply for a mortgage</button>
+          <button class="btn ghost sm" data-act="buyCash" data-id="${i}">Buy with cash</button></div>`}</section>`;
+    }).join('');
+    return `<div class="cols"><div class="stack">${homeCard}
+      ${pendingM ? `<div class="alert"><span><b>Mortgage application waiting.</b> Go see the banker at the teller window.</span></div>` : ''}
+      <section class="panel"><h3>${h ? 'Homes in town' : 'Find a place to live'}</h3>${list}</section></div>
+      <div class="stack"><section class="panel"><h3>Rent or buy?</h3>
+        <p class="muted"><b>Renting</b> is cheaper to start. You pay rent forever and own nothing.</p>
+        <p class="muted"><b>A mortgage</b> needs a ${cfg('downPct')}% down payment and a credit score of at least 580. The bank lends the rest. After ${every('mortgageTerm')} payments the home is yours.</p>
+        <p class="muted"><b>Paying cash</b> means no payments ever, but you need the whole price saved up.</p>
+        <p>Your credit score: <span class="pill ${cr.band[1]}">${cr.score}</span></p></section></div></div>`;
   }
   if (S.tab === 'pay') {
     const others = playerList().filter(x => x.id !== pid);
@@ -471,27 +659,30 @@ function playerView() {
     </div><div class="stack"><section class="panel"><h3>Your checks</h3><div class="list">${txRows(checks, pid, 30)}</div></section></div></div>`;
   }
   if (S.tab === 'shop') {
-    const bizs = Object.values(S.shops).filter(s => s.ownerId !== pid).sort((a, c) => bizType(a).localeCompare(bizType(c)));
+    const bizs = Object.values(S.shops).filter(s => s.ownerId !== pid).sort((a, c) => (salePct(c) - salePct(a)) || bizType(a).localeCompare(bizType(c)));
     const mine = S.orders.filter(o => o.buyerId === pid).sort((a, c) => c.at - a.at);
+    const onSale = Object.values(S.shops).filter(s => salePct(s));
     return `<div class="cols"><div class="stack">
-      <div><p class="eyebrow">Main Street</p><h2>Shops & restaurants</h2></div>
+      <div><p class="eyebrow">Main Street · Day ${today()}</p><h2>Shops & restaurants</h2></div>
+      ${newsBanner()}
+      ${onSale.length ? `<div class="alert sale"><span><b>Sales today:</b> ${onSale.map(s => `${esc(s.name)} ${salePct(s)}% off`).join(' · ')}</span></div>` : ''}
       ${bizs.length ? bizs.map(s => {
-        const T = BIZ[bizType(s)], items = Object.values(S.items).filter(i => i.shopId === s.id), isR = bizType(s) === 'restaurant';
+        const T = BIZ[bizType(s)], items = Object.values(S.items).filter(i => i.shopId === s.id), isR = bizType(s) === 'restaurant', pct = salePct(s);
         return `<section class="shop"><div class="awning" ${isR ? 'style="background:repeating-linear-gradient(90deg,var(--bad) 0 18px,var(--card) 18px 36px)"' : ''}></div>
-          <div class="panel-head"><h3>${esc(s.name)}</h3><span class="muted" style="font-size:.85rem">${T.Noun} · Owner: ${esc(nameOf(s.ownerId))}</span></div>
+          <div class="panel-head"><h3>${esc(s.name)} ${pct ? `<span class="pill bad">${pct}% off · ${saleWhen(s)}</span>` : ''}</h3><span class="muted" style="font-size:.85rem">${T.Noun} · Owner: ${esc(nameOf(s.ownerId))}</span></div>
           ${s.desc ? `<p class="muted">${esc(s.desc)}</p>` : ''}
           ${isR && items.length ? `<label class="inline" style="display:flex;align-items:center;gap:8px">Tip for the server <select class="tipsel" id="tip-${s.id}"><option value="0">No tip</option><option value="10">10%</option><option value="15" selected>15%</option><option value="20">20%</option></select></label>` : ''}
           <div class="list">${items.length ? items.map(i => {
             const out = i.stock != null && i.stock <= 0;
             return `<div class="li"><div class="main"><b>${esc(i.name)}</b><small>${i.stock == null ? (isR ? 'On the menu' : 'Always in stock') : out ? 'Sold out' : i.stock + ' left'}</small></div>
-              <span class="amt">${money(i.price)}</span>
+              <span class="amt">${pct ? `<s class="muted">${money(i.price)}</s> <b class="neg">${money(priceNow(i, s))}</b>` : money(i.price)}</span>
               ${out ? '' : `<input id="q-${i.id}" type="number" min="1" value="1" style="width:70px;min-height:40px;padding:6px 8px" aria-label="Quantity"><button class="btn sm" data-act="buy" data-id="${i.id}">${T.buy}</button>`}</div>`;
           }).join('') : `<div class="empty">Nothing on the ${T.list.toLowerCase()} yet.</div>`}</div></section>`;
       }).join('') : '<div class="empty">No other businesses are open yet. Open your own under My businesses.</div>'}
     </div><div class="stack"><section class="panel"><h3>Your orders</h3><div class="list">${mine.length ? mine.map(o => {
       const T = BIZ[o.bizType === 'restaurant' ? 'restaurant' : 'shop'];
       const st = o.status === 'new' ? ['Ordered', 'warn'] : o.status === 'done' ? [T.done, 'good'] : ['Refunded', 'mute'];
-      return `<div class="li"><div class="main"><b>${o.qty} × ${esc(o.itemName)}</b><small>${esc(S.shops[o.shopId]?.name || 'Closed')} · ${o.day ? 'Day ' + o.day : when(o.at)}${o.tip ? ' · tip ' + money(o.tip) : ''}</small></div><span class="pill ${st[1]}">${st[0]}</span><span class="amt">${money(o.total)}</span></div>`;
+      return `<div class="li"><div class="main"><b>${o.qty} × ${esc(o.itemName)}</b><small>${esc(S.shops[o.shopId]?.name || 'Closed')} · ${o.day ? 'Day ' + o.day : when(o.at)}${o.salePct ? ' · ' + o.salePct + '% off' : ''}${o.tip ? ' · tip ' + money(o.tip) : ''}</small></div><span class="pill ${st[1]}">${st[0]}</span><span class="amt">${money(o.total)}</span></div>`;
     }).join('') : '<div class="empty">You haven’t ordered anything.</div>'}</div></section></div></div>`;
   }
   if (S.tab === 'myshop') {
@@ -503,10 +694,54 @@ function playerView() {
       <label>What do you ${t === 'shop' ? 'sell' : 'serve'}?<input id="ob-d-${t}" maxlength="100" placeholder="${T.php}"></label><div><button class="btn">Open for business</button></div></form></section>`; });
     return blocks.join('') + (openForms.length ? `<div class="cols even">${openForms.map(f => `<div class="stack">${f}</div>`).join('')}</div>` : '');
   }
-  if (S.tab === 'loans') {
-    const cr = credit(pid), loans = loansOf(pid);
-    const st = {requested: ['Waiting for banker', 'warn'], active: ['Active', 'note'], paid: ['Paid off', 'good'], declined: ['Declined', 'mute']};
+  if (S.tab === 'stocks') {
+    const bizs = Object.values(S.shops);
+    const mine = holdingsOf(pid);
+    const value = mine.reduce((s, h) => s + h.shares * sharePrice(h.shopId), 0), cost = mine.reduce((s, h) => s + (h.cost || 0), 0);
     return `<div class="cols"><div class="stack">
+      <div><p class="eyebrow">Town Stock Exchange · Day ${today()}</p><h2>The market</h2></div>
+      ${newsBanner()}
+      <section class="panel">${bizs.length ? `<div class="tbl-wrap"><table><thead><tr><th>Business</th><th class="r">Price</th><th class="r">Today</th><th>Last 7 days</th><th class="r">Shares left</th><th></th></tr></thead><tbody>
+        ${bizs.map(s => { const pNow = sharePrice(s.id), pPrev = sharePrice(s.id, Math.max(1, today() - 1)), ch = pPrev ? (pNow - pPrev) / pPrev * 100 : 0, left = SHARES - sharesOut(s.id), own = s.ownerId === pid;
+          return `<tr><td><b>${esc(s.name)}</b><br><small class="muted">${BIZ[bizType(s)].Noun} · ${esc(nameOf(s.ownerId))}</small></td><td class="r num">${money(pNow)}</td>
+          <td class="r num ${ch > 0 ? 'pos' : ch < 0 ? 'neg' : 'muted'}">${ch > 0 ? '▲' : ch < 0 ? '▼' : '–'} ${Math.abs(ch).toFixed(1)}%</td><td>${spark(s.id)}</td><td class="r">${left}</td>
+          <td class="r">${own ? '<small class="muted">Your business</small>' : left > 0 ? `<div class="row" style="justify-content:flex-end;flex-wrap:nowrap"><input id="sb-${s.id}" type="number" min="1" max="${left}" value="1" style="width:64px;min-height:38px;padding:6px" aria-label="Shares"><button class="btn sm" data-act="buyStock" data-id="${s.id}">Buy</button></div>` : '<small class="muted">Sold out</small>'}</td></tr>`; }).join('')}
+        </tbody></table></div>` : '<div class="empty">No businesses to invest in yet.</div>'}</section>
+    </div><div class="stack">
+      <section class="panel"><h3>Your portfolio</h3>
+        <div class="stats"><div class="stat"><b>${money(value)}</b><span>Worth now</span></div><div class="stat"><b class="${value - cost >= 0 ? 'pos' : 'neg'}">${money(value - cost, true)}</b><span>Gain or loss</span></div></div>
+        <div class="list">${mine.length ? mine.map(h => { const pr = sharePrice(h.shopId), v = h.shares * pr, g = v - (h.cost || 0);
+          return `<div class="li"><div class="main"><b>${esc(S.shops[h.shopId]?.name || 'Closed business')}</b><small>${h.shares} share${h.shares > 1 ? 's' : ''} · paid ${money(h.cost)} · now ${money(v)} <span class="${g >= 0 ? 'pos' : 'neg'}">(${money(g, true)})</span></small></div>
+            <input id="ss-${h.shopId}" type="number" min="1" max="${h.shares}" value="${h.shares}" style="width:64px;min-height:38px;padding:6px" aria-label="Shares to sell"><button class="btn ghost sm" data-act="sellStock" data-id="${h.shopId}">Sell</button></div>`; }).join('') : '<div class="empty">You don’t own any shares yet.</div>'}</div></section>
+      <section class="panel"><h3>How the market works</h3><p class="muted">Every business has ${SHARES} shares. A share starts at ${money(Math.round(10000 / SHARES))} and goes up as the business sells more over the last 7 days. Buy shares in businesses you think will do well. Sell when the price is higher than what you paid to make a profit. Town news can move every price for a day.</p></section>
+    </div></div>`;
+  }
+  if (S.tab === 'bank') {
+    const cr = credit(pid), loans = loansOf(pid), reqs = tellerOf(pid).sort((a, c) => c.at - a.at).slice(0, 10), cds = cdsOf(pid).sort((a, c) => c.openDay - a.openDay);
+    const st = {requested: ['Waiting for banker', 'warn'], active: ['Active', 'note'], paid: ['Paid off', 'good'], declined: ['Declined', 'mute']};
+    const TK = {withdraw: 'Cash withdrawal', deposit: 'Cash deposit', cd: 'Open a CD', cdclose: 'Cash out CD early', mortgage: 'Mortgage application'};
+    const cdPay = Math.round(10000 * (100 + cfg('cdRate')) / 100);
+    return `<div class="cols"><div class="stack">
+      <section class="panel"><div class="panel-head"><h3>Teller window</h3><span class="pill note">In person</span></div>
+        <p class="muted">These need a visit to the banker. Send the request, then go to the bank. The banker hands you cash, takes your cash, or opens your account.</p>
+        <form class="inline" data-form="tellerReq" data-id="withdraw"><label>Withdraw cash from checking<input id="tw-amt" inputmode="decimal" placeholder="0.00" required></label><button class="btn">Request</button></form>
+        <form class="inline" data-form="tellerReq" data-id="deposit"><label>Deposit cash<input id="td-amt" inputmode="decimal" placeholder="0.00" required></label><label style="flex:0 1 150px">Into<select id="td-acct"><option value="c">Checking</option><option value="s">Savings</option></select></label><button class="btn">Request</button></form>
+        <form class="inline" data-form="tellerReq" data-id="cd"><label>Open a CD (${cfg('cdRate')}% for ${every('cdDays')} days)<input id="tc-amt" inputmode="decimal" placeholder="0.00" required></label><button class="btn gold">Request</button></form>
+        <p class="muted" style="font-size:.85rem">A CD (certificate of deposit) locks your money away. ${money(10000)} becomes ${money(cdPay)} in ${every('cdDays')} days. Cash out early and you lose the interest plus ${cfg('cdPenalty')}%.</p>
+        ${reqs.length ? `<div class="list">${reqs.map(r => `<div class="li"><div class="main"><b>${TK[r.kind]}${r.amount ? ' · ' + money(r.amount) : ''}</b><small>Day ${r.day}${r.status === 'waiting' ? ' · go see the banker' : ''}</small></div><span class="pill ${r.status === 'waiting' ? 'warn' : r.status === 'done' ? 'good' : 'mute'}">${r.status === 'waiting' ? 'Waiting' : r.status === 'done' ? 'Done' : 'Declined'}</span>${r.status === 'waiting' ? `<button class="btn ghost sm" data-act="cancelTeller" data-id="${r.id}">Cancel</button>` : ''}</div>`).join('')}</div>` : ''}
+      </section>
+      <section class="panel"><h3>Your CDs</h3>${cds.length ? `<div class="list">${cds.map(c => `<div class="li"><div class="main"><b>${money(c.amount)} → ${money(c.payout)}</b><small>Opened Day ${c.openDay} · ${c.status === 'open' ? 'matures ' + dayIn(c.matureDay) : c.status === 'matured' ? 'paid out' : 'cashed out early'}</small></div>
+        ${c.status === 'open' ? `<button class="btn ghost sm" data-act="cdEarly" data-id="${c.id}">Cash out early</button>` : `<span class="pill ${c.status === 'matured' ? 'good' : 'mute'}">${c.status === 'matured' ? 'Matured' : 'Closed'}</span>`}</div>`).join('')}</div>` : '<div class="empty">No CDs yet.</div>'}</section>
+      <section class="panel"><h3>Your loans</h3>${loans.length ? loans.map(l => `<div class="shop">
+        <div class="panel-head"><b>${esc(l.purpose || 'Loan')} · ${money(l.amount)}</b><span class="pill ${st[l.status][1]}">${st[l.status][0]}</span></div>
+        ${l.status === 'active' ? `<p>Still owe <b class="num">${money(l.balance)}</b> · ${l.rate}% interest every ${every('interestEvery')} days · interest so far <span class="num">${money(l.interest || 0)}</span></p>
+          <form class="inline" data-form="repay" data-id="${l.id}"><label>Pay back<input id="rp-${l.id}" inputmode="decimal" placeholder="${(Math.min(l.balance, Math.max(0, bal(b, pid, 'c'))) / 100).toFixed(2)}" required></label><button class="btn gold">Make payment</button></form>`
+        : `<small class="muted">${when(l.at)}${l.status === 'paid' ? ` · paid ${money(l.interest || 0)} in interest` : ''}</small>`}</div>`).join('') : '<div class="empty">No loans yet.</div>'}
+        <h3 style="margin-top:6px">Ask for a loan</h3><p>You can borrow up to <b class="num">${money(cr.avail)}</b> right now at <b>${cfg('loanRate')}%</b> every ${every('interestEvery')} days.</p>
+        <form data-form="request"><div class="fields"><label>Amount<input id="lr-amt" inputmode="decimal" required placeholder="0.00"></label>
+          <label>What’s it for?<input id="lr-why" maxlength="50" required placeholder="Supplies for my shop"></label></div>
+          <div><button class="btn" ${cr.avail <= 0 ? 'disabled' : ''}>Send to the banker</button></div></form></section>
+    </div><div class="stack">
       <section class="panel"><div class="gauge-wrap">${gauge(cr.score, cr.band[1])}<div style="display:grid;gap:4px"><p class="eyebrow">Your credit score</p><div class="score num">${cr.score}</div><span class="pill ${cr.band[1]}">${cr.band[0]}</span></div></div>
         <div class="stats">
           <div class="stat"><b>${cr.paid}</b><span>Loans paid off (+40 each)</span></div>
@@ -515,17 +750,7 @@ function playerView() {
           <div class="stat"><b>${cr.late}</b><span>Late bills (−30 each)</span></div>
           <div class="stat"><b>${cr.missed}</b><span>Missed loan payments (−60 each)</span></div>
           <div class="stat"><b>${money(cr.owed)}</b><span>Owed of ${money(cr.limit)} limit</span></div></div>
-        <p class="muted" style="font-size:.88rem">Scores run 300 to 850. Paying bills and loans on time raises it. Late bills, missed payments, or borrowing close to your limit lower it. A better score gives you a bigger credit limit.</p></section>
-      <section class="panel"><h3>Your loans</h3>${loans.length ? loans.map(l => `<div class="shop">
-        <div class="panel-head"><b>${esc(l.purpose || 'Loan')} · ${money(l.amount)}</b><span class="pill ${st[l.status][1]}">${st[l.status][0]}</span></div>
-        ${l.status === 'active' ? `<p>Still owe <b class="num">${money(l.balance)}</b> · ${l.rate}% interest every ${every('interestEvery')} days · interest so far <span class="num">${money(l.interest || 0)}</span></p>
-          <form class="inline" data-form="repay" data-id="${l.id}"><label>Pay back<input id="rp-${l.id}" inputmode="decimal" placeholder="${(Math.min(l.balance, Math.max(0, bal(b, pid, 'c'))) / 100).toFixed(2)}" required></label><button class="btn gold">Make payment</button></form>`
-        : `<small class="muted">${when(l.at)}${l.status === 'paid' ? ` · paid ${money(l.interest || 0)} in interest` : ''}</small>`}</div>`).join('') : '<div class="empty">No loans yet.</div>'}</section>
-    </div><div class="stack">
-      <section class="panel"><h3>Ask for a loan</h3><p>You can borrow up to <b class="num">${money(cr.avail)}</b> right now. Current loan rate: <b>${cfg('loanRate')}%</b> every ${every('interestEvery')} days.</p>
-        <form data-form="request"><div class="fields"><label>Amount<input id="lr-amt" inputmode="decimal" required placeholder="0.00"></label>
-          <label>What’s it for?<input id="lr-why" maxlength="50" required placeholder="Supplies for my shop"></label></div>
-          <div><button class="btn" ${cr.avail <= 0 ? 'disabled' : ''}>Send to the banker</button></div></form></section>
+        <p class="muted" style="font-size:.88rem">Scores run 300 to 850. You need at least 580 for a mortgage. Paying bills and loans on time raises it. Late bills, missed payments, or borrowing close to your limit lower it.</p></section>
     </div></div>`;
   }
   return '';
@@ -537,11 +762,16 @@ function manageBiz(shop) {
   const orders = S.orders.filter(o => o.shopId === shop.id).sort((a, c) => c.at - a.at);
   const kept = orders.filter(o => o.status !== 'refunded');
   const sales = kept.reduce((s, o) => s + o.total, 0), tips = kept.reduce((s, o) => s + (o.tip || 0), 0);
-  const sid = shop.id;
+  const sid = shop.id, pct = salePct(shop);
   return `<div class="panel-head"><div><p class="eyebrow">Your ${T.noun}</p><h2>${esc(shop.name)}</h2></div><button class="btn danger sm" data-act="closeShop" data-id="${sid}">Close ${T.noun}</button></div>
-    <div class="stats"><div class="stat"><b>${money(sales)}</b><span>Total sales</span></div>${t === 'restaurant' ? `<div class="stat"><b>${money(tips)}</b><span>Tips earned</span></div>` : ''}<div class="stat"><b>${orders.filter(o => o.status === 'new').length}</b><span>Orders to ${t === 'shop' ? 'deliver' : 'serve'}</span></div><div class="stat"><b>${items.length}</b><span>${t === 'shop' ? 'Items for sale' : 'Dishes on the menu'}</span></div></div>
+    <div class="stats"><div class="stat"><b>${money(sales)}</b><span>Total sales</span></div>${t === 'restaurant' ? `<div class="stat"><b>${money(tips)}</b><span>Tips earned</span></div>` : ''}<div class="stat"><b>${money(sharePrice(sid))}</b><span>Share price · ${sharesOut(sid)} of ${SHARES} owned by investors</span></div><div class="stat"><b>${orders.filter(o => o.status === 'new').length}</b><span>Orders to ${t === 'shop' ? 'deliver' : 'serve'}</span></div></div>
     <div class="cols even"><div class="stack">
-      <section class="panel"><h3>Orders</h3><div class="list">${orders.length ? orders.map(o => `<div class="li"><div class="main"><b>${o.qty} × ${esc(o.itemName)}</b><small>${esc(nameOf(o.buyerId))} · ${o.day ? 'Day ' + o.day : when(o.at)} · ${money(o.total)}${o.tip ? ' incl. ' + money(o.tip) + ' tip' : ''}</small></div>
+      <section class="panel"><div class="panel-head"><h3>Sales & promotions</h3>${pct ? `<span class="pill bad">${pct}% off · ${saleWhen(shop)}</span>` : ''}</div>
+        ${pct ? `<p class="muted">Everything is ${pct}% off on Main Street ${saleWhen(shop)}.</p><div><button class="btn ghost sm" data-act="endSale" data-id="${sid}">End the sale</button></div>`
+        : `<p class="muted">Run a sale to bring in customers. Everything on your ${T.list.toLowerCase()} gets cheaper and Main Street shows it off.</p>
+        <form class="inline" data-form="startSale" data-id="${sid}"><label>Discount<select id="sl-p-${sid}"><option value="10">10% off</option><option value="20" selected>20% off</option><option value="25">25% off</option><option value="50">Half off</option></select></label>
+          <label>How long<select id="sl-d-${sid}"><option value="1">Today only</option><option value="2">2 days</option><option value="3">3 days</option></select></label><button class="btn gold">Start sale</button></form>`}</section>
+      <section class="panel"><h3>Orders</h3><div class="list">${orders.length ? orders.map(o => `<div class="li"><div class="main"><b>${o.qty} × ${esc(o.itemName)}</b><small>${esc(nameOf(o.buyerId))} · ${o.day ? 'Day ' + o.day : when(o.at)} · ${money(o.total)}${o.salePct ? ' · ' + o.salePct + '% off' : ''}${o.tip ? ' incl. ' + money(o.tip) + ' tip' : ''}</small></div>
         ${o.status === 'new' ? `<button class="btn sm" data-act="deliver" data-id="${o.id}">${T.done}</button><button class="btn ghost sm" data-act="refund" data-id="${o.id}">Refund</button>` : `<span class="pill ${o.status === 'done' ? 'good' : 'mute'}">${o.status === 'done' ? T.done : 'Refunded'}</span>`}</div>`).join('') : '<div class="empty">No orders yet.</div>'}</div></section>
     </div><div class="stack">
       <section class="panel"><h3>Add to the ${T.list.toLowerCase()}</h3><form data-form="addItem" data-id="${sid}"><div class="fields">
@@ -550,7 +780,7 @@ function manageBiz(shop) {
         <label>${t === 'shop' ? 'Stock' : 'Servings'}<input id="ai-s-${sid}" type="number" min="0" placeholder="Blank = unlimited"></label></div>
         <div><button class="btn">Add</button></div></form></section>
       <section class="panel"><h3>${T.list}</h3><div class="list">${items.length ? items.map(i => `<form class="li" data-form="editItem" data-id="${i.id}" style="display:flex">
-        <div class="main"><b>${esc(i.name)}</b></div>
+        <div class="main"><b>${esc(i.name)}</b>${pct ? `<small class="neg">On sale: ${money(priceNow(i, shop))}</small>` : ''}</div>
         <input id="ei-p-${i.id}" inputmode="decimal" value="${(i.price / 100).toFixed(2)}" style="width:86px;min-height:40px;padding:6px 8px" aria-label="Price">
         <input id="ei-s-${i.id}" type="number" min="0" value="${i.stock ?? ''}" placeholder="∞" style="width:70px;min-height:40px;padding:6px 8px" aria-label="Stock">
         <button class="btn ghost sm">Save</button><button type="button" class="btn danger sm" data-act="removeItem" data-id="${i.id}" aria-label="Remove">✕</button></form>`).join('') : `<div class="empty">Add your first ${T.item.toLowerCase()}.</div>`}</div></section>
@@ -559,17 +789,22 @@ function manageBiz(shop) {
 
 // ---------- banker views ----------
 function bankView() {
+  if (S.tab === 'messages') return messagesView();
   const b = balances(), ps = playerList();
   if (S.tab === 'town') {
     const chk = ps.reduce((s, p) => s + bal(b, p.id, 'c'), 0), sav = ps.reduce((s, p) => s + bal(b, p.id, 's'), 0);
-    const owed = Object.values(S.loans).filter(l => l.status === 'active').reduce((s, l) => s + l.balance, 0);
+    const owed = Object.values(S.loans).filter(l => l.status === 'active').reduce((s, l) => s + l.balance, 0) + ps.reduce((s, p) => s + (p.home?.mode === 'mortgage' ? p.home.balance : 0), 0);
     const unpaid = S.bills.filter(x => x.status === 'due' || x.status === 'late');
-    return `<div class="alert"><span><b>Day ${today()}</b> · next payday ${dayIn(nextOn('payEvery'))} · bills ${dayIn(nextOn('billEvery'))} · interest ${dayIn(nextOn('interestEvery'))}</span><button class="btn gold sm" data-act="advance">Advance to Day ${today() + 1}</button></div>
-    <div class="stats"><div class="stat"><b>${money(chk + sav)}</b><span>Money in town</span></div><div class="stat"><b>${money(sav)}</b><span>In savings</span></div>
-      <div class="stat"><b>${money(owed)}</b><span>Owed on loans</span></div><div class="stat"><b>${money(unpaid.reduce((s, x) => s + x.total, 0))}</b><span>Unpaid bills (${unpaid.length})</span></div></div>
+    const q = waitingTeller().length + Object.values(S.loans).filter(l => l.status === 'requested').length;
+    const news = S.settings.news || [];
+    return `<div class="alert"><span><b>Day ${today()}</b> · next payday ${dayIn(nextOn('payEvery'))} · bills ${dayIn(nextOn('billEvery'))} · rent ${dayIn(nextOn('rentEvery'))} · interest ${dayIn(nextOn('interestEvery'))}</span><button class="btn gold sm" data-act="advance">Advance to Day ${today() + 1}</button></div>
+    ${q ? `<div class="alert bad"><span><b>${q} customer${q > 1 ? 's' : ''} waiting at the teller window</b></span><button class="btn sm" data-act="tab" data-id="teller">Open the window</button></div>` : ''}
+    ${newsBanner()}
+    <div class="stats"><div class="stat"><b>${money(chk + sav)}</b><span>Money in accounts</span></div><div class="stat"><b>${money(sav)}</b><span>In savings</span></div>
+      <div class="stat"><b>${money(owed)}</b><span>Owed on loans & mortgages</span></div><div class="stat"><b>${money(unpaid.reduce((s, x) => s + x.total, 0))}</b><span>Unpaid bills (${unpaid.length})</span></div></div>
     <div class="cols"><div class="stack">
-      <section class="panel"><h3>Residents</h3>${ps.length ? `<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Job</th><th class="r">Checking</th><th class="r">Savings</th><th class="r">Owes</th><th class="r">Bills</th><th class="r">Credit</th></tr></thead><tbody>
-        ${ps.map(p => { const c = credit(p.id), ob = openBills(p.id); return `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.job || '—')}</td><td class="r num ${bal(b, p.id, 'c') < 0 ? 'neg' : ''}">${money(bal(b, p.id, 'c'))}</td><td class="r num">${money(bal(b, p.id, 's'))}</td><td class="r num">${money(c.owed)}</td><td class="r">${ob.length ? `<span class="pill ${ob.some(x => x.status === 'late') ? 'bad' : 'warn'}">${ob.length} open</span>` : '<span class="pill good">Paid</span>'}</td><td class="r"><span class="pill ${c.band[1]}">${c.score}</span></td></tr>`; }).join('')}
+      <section class="panel"><h3>Residents</h3>${ps.length ? `<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Home</th><th class="r">Checking</th><th class="r">Savings</th><th class="r">Net worth</th><th class="r">Bills</th><th class="r">Credit</th></tr></thead><tbody>
+        ${ps.map(p => { const c = credit(p.id), ob = openBills(p.id); return `<tr><td><b>${esc(p.name)}</b><br><small class="muted">${esc(p.job || 'No job')}</small></td><td>${p.home ? esc(p.home.name) + `<br><small class="muted">${p.home.mode === 'rent' ? 'Renting' : p.home.mode === 'mortgage' ? 'Mortgage' : 'Owns'}</small>` : '<small class="muted">None</small>'}</td><td class="r num ${bal(b, p.id, 'c') < 0 ? 'neg' : ''}">${money(bal(b, p.id, 'c'))}</td><td class="r num">${money(bal(b, p.id, 's'))}</td><td class="r num">${money(netWorth(p.id, b))}</td><td class="r">${ob.length ? `<span class="pill ${ob.some(x => x.status === 'late') ? 'bad' : 'warn'}">${ob.length} open</span>` : '<span class="pill good">Paid</span>'}</td><td class="r"><span class="pill ${c.band[1]}">${c.score}</span></td></tr>`; }).join('')}
         </tbody></table></div>` : `<div class="empty">Add residents under the Residents tab.</div>`}</section>
       <section class="panel"><h3>Town ledger</h3><div class="list">${txRows(S.tx, null, 60)}</div></section>
     </div><div class="stack">
@@ -581,13 +816,15 @@ function bankView() {
           <label>Amount<input id="ad-amt" inputmode="decimal" required placeholder="0.00"></label></div>
           <label>Reason<input id="ad-memo" maxlength="60" placeholder="Great job cleaning your room"></label>
           <div><button class="btn">Record it</button></div></form></section>
+      <section class="panel"><h3>Town news</h3><div class="list">${news.length ? news.map(n => `<div class="li"><span class="badge">D${n.day}</span><div class="main"><b>${esc(n.title)}</b><small>${esc(n.text)}</small></div></div>`).join('') : '<div class="empty">No town events yet.</div>'}</div></section>
     </div></div>`;
   }
   if (S.tab === 'calendar') {
     const d = today() + 1, tr = cfg('taxRate'), paid = ps.filter(p => (p.wage || 0) > 0);
-    const willPay = d % every('payEvery') === 0, willInt = d % every('interestEvery') === 0, willBill = d % every('billEvery') === 0;
-    const willLate = S.bills.filter(x => x.status === 'due' && x.dueDay < d);
-    const happens = [willPay && `Payday: ${paid.length} paycheck${paid.length === 1 ? '' : 's'}`, willBill && `Utility bills to ${ps.length} resident${ps.length === 1 ? '' : 's'} (${money(billTotal())} each)`, willInt && 'Interest day for loans and savings', willLate.length && `${willLate.length} unpaid bill${willLate.length > 1 ? 's' : ''} turn late (+${money(cfg('lateFee'))} fee each)`].filter(Boolean);
+    const willPay = d % every('payEvery') === 0, willInt = d % every('interestEvery') === 0, willBill = d % every('billEvery') === 0, willRent = d % every('rentEvery') === 0;
+    const willLate = S.bills.filter(x => x.status === 'due' && x.dueDay < d), willCd = S.cds.filter(c => c.status === 'open' && c.matureDay <= d);
+    const housed = ps.filter(p => p.home && p.home.mode !== 'own').length;
+    const happens = [willPay && `Payday: ${paid.length} paycheck${paid.length === 1 ? '' : 's'}${S.settings.payBonus ? ` with a ${S.settings.payBonus}% bonus` : ''}`, willBill && `Utility bills to ${ps.length} resident${ps.length === 1 ? '' : 's'} (${money(billTotal())} each)`, willRent && housed && `Rent and mortgage bills for ${housed} home${housed > 1 ? 's' : ''}`, willInt && `Interest day for loans and savings${Number(S.settings.savingsBoost || 1) > 1 ? ' (savings doubled)' : ''}`, willCd.length && `${willCd.length} CD${willCd.length > 1 ? 's' : ''} mature and pay out`, willLate.length && `${willLate.length} unpaid bill${willLate.length > 1 ? 's' : ''} turn late (+${money(cfg('lateFee'))} fee each)`, cfg('eventChance') > 0 && `${Math.round(cfg('eventChance'))}% chance of a town event`].filter(Boolean);
     const unpaid = S.bills.filter(x => x.status === 'due' || x.status === 'late').sort((a, c) => a.dueDay - c.dueDay);
     return `<div class="cols"><div class="stack">
       <section class="panel"><div class="panel-head"><div><p class="eyebrow">Today in ${esc(S.settings.name)}</p><div class="bigday">Day ${today()}</div></div>
@@ -596,30 +833,48 @@ function bankView() {
         ${happens.length ? `<div class="list">${happens.map(h => `<div class="li"><div class="main"><b>${esc(h)}</b></div></div>`).join('')}</div>` : '<p class="muted">Nothing scheduled. Just a regular day.</p>'}</div></section>
       <section class="panel"><h3>Schedule</h3><div class="cal">
         <div class="stat"><b>${dayIn(nextOn('payEvery'))}</b><span>Payday · every ${every('payEvery')} days</span></div>
-        <div class="stat"><b>${dayIn(nextOn('billEvery'))}</b><span>Bills · every ${every('billEvery')} days, due in ${Math.round(cfg('billGrace'))}</span></div>
+        <div class="stat"><b>${dayIn(nextOn('billEvery'))}</b><span>Utilities · every ${every('billEvery')} days, due in ${Math.round(cfg('billGrace'))}</span></div>
+        <div class="stat"><b>${dayIn(nextOn('rentEvery'))}</b><span>Rent & mortgages · every ${every('rentEvery')} days</span></div>
         <div class="stat"><b>${dayIn(nextOn('interestEvery'))}</b><span>Interest · every ${every('interestEvery')} days</span></div></div>
         <p class="muted" style="font-size:.85rem">Change how often these happen in Settings.</p></section>
       <section class="panel"><h3>Pay stubs for next payday</h3>${paid.length ? `<div class="tbl-wrap"><table><thead><tr><th>Resident</th><th>Job</th><th class="r">Gross</th><th class="r">Tax ${tr}%</th><th class="r">Take-home</th></tr></thead><tbody>
-        ${paid.map(p => { const t = Math.round(p.wage * tr / 100); return `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.job || '—')}</td><td class="r num">${money(p.wage)}</td><td class="r num neg">${money(-t)}</td><td class="r num"><b>${money(p.wage - t)}</b></td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty">Nobody has a wage yet. Set jobs and wages under Residents.</div>'}</section>
+        ${paid.map(p => { const g = Math.round(p.wage * (100 + Number(S.settings.payBonus || 0)) / 100), t = Math.round(g * tr / 100); return `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.job || '—')}</td><td class="r num">${money(g)}</td><td class="r num neg">${money(-t)}</td><td class="r num"><b>${money(g - t)}</b></td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty">Nobody has a wage yet. Set jobs and wages under Residents.</div>'}</section>
     </div><div class="stack">
-      <section class="panel"><h3>Unpaid bills</h3><div class="list">${unpaid.length ? unpaid.map(x => `<div class="li"><div class="main"><b>${esc(nameOf(x.playerId))}</b><small>Issued Day ${x.issuedDay} · due Day ${x.dueDay}</small></div><span class="pill ${x.status === 'late' ? 'bad' : 'warn'}">${x.status === 'late' ? 'Late' : 'Due'}</span><span class="amt">${money(x.total)}</span></div>`).join('') : '<div class="empty">Everyone is paid up.</div>'}</div></section>
+      <section class="panel"><h3>Town events</h3><p class="muted" style="font-size:.88rem">Prizes, storms, market swings, lost wallets and more. One may happen when you advance the day, or you can draw one now.</p>
+        <div><button class="btn" data-act="runNow" data-id="event">Draw an event card</button></div></section>
+      <section class="panel"><h3>Unpaid bills</h3><div class="list">${unpaid.length ? unpaid.map(x => `<div class="li"><div class="main"><b>${esc(nameOf(x.playerId))} · ${esc(x.label || 'Utilities')}</b><small>Issued Day ${x.issuedDay} · due Day ${x.dueDay}</small></div><span class="pill ${x.status === 'late' ? 'bad' : 'warn'}">${x.status === 'late' ? 'Late' : 'Due'}</span><span class="amt">${money(x.total)}</span></div>`).join('') : '<div class="empty">Everyone is paid up.</div>'}</div></section>
       <section class="panel"><h3>Run something now</h3><p class="muted" style="font-size:.88rem">For a bonus payday or a surprise bill without changing the day.</p>
-        <div class="row"><button class="btn ghost sm" data-act="runNow" data-id="pay">Payday now</button><button class="btn ghost sm" data-act="runNow" data-id="bills">Send bills now</button><button class="btn ghost sm" data-act="runNow" data-id="interest">Interest now</button></div></section>
+        <div class="row"><button class="btn ghost sm" data-act="runNow" data-id="pay">Payday now</button><button class="btn ghost sm" data-act="runNow" data-id="bills">Utility bills now</button><button class="btn ghost sm" data-act="runNow" data-id="interest">Interest now</button></div></section>
     </div></div>`;
   }
-  if (S.tab === 'loans') {
+  if (S.tab === 'teller') {
     const all = Object.values(S.loans).sort((a, c) => c.at - a.at);
     const req = all.filter(l => l.status === 'requested'), act = all.filter(l => l.status === 'active');
+    const waiting = waitingTeller().sort((a, c) => a.at - c.at);
+    const mortgages = ps.filter(p => p.home?.mode === 'mortgage'), cds = S.cds.filter(c => c.status === 'open');
+    const card = r => {
+      const who = esc(nameOf(r.playerId)), c = bal(b, r.playerId, 'c');
+      if (r.kind === 'withdraw') return `<div class="shop"><div class="panel-head"><b>${who} wants ${money(r.amount)} in cash</b><span class="pill warn">Withdrawal</span></div><p class="muted">Checking has ${money(c)}. Hand over the play money, then tap Done.</p><div class="row"><button class="btn" data-act="tellerDone" data-id="${r.id}">Done, cash handed over</button><button class="btn ghost" data-act="tellerDecline" data-id="${r.id}">Decline</button></div></div>`;
+      if (r.kind === 'deposit') return `<div class="shop"><div class="panel-head"><b>${who} is depositing ${money(r.amount)}</b><span class="pill good">Deposit</span></div><p class="muted">Into ${r.acct === 's' ? 'savings' : 'checking'}. Count the play money, then tap Done.</p><div class="row"><button class="btn" data-act="tellerDone" data-id="${r.id}">Done, cash received</button><button class="btn ghost" data-act="tellerDecline" data-id="${r.id}">Decline</button></div></div>`;
+      if (r.kind === 'cd') return `<div class="shop"><div class="panel-head"><b>${who} wants to open a ${money(r.amount)} CD</b><span class="pill note">CD</span></div><p class="muted">Pays ${money(Math.round(r.amount * (100 + cfg('cdRate')) / 100))} in ${every('cdDays')} days. Checking has ${money(c)}.</p><div class="row"><button class="btn" data-act="tellerDone" data-id="${r.id}">Open the CD</button><button class="btn ghost" data-act="tellerDecline" data-id="${r.id}">Decline</button></div></div>`;
+      if (r.kind === 'cdclose') { const cd = S.cds.find(x => x.id === r.cdId); return `<div class="shop"><div class="panel-head"><b>${who} wants to cash out a CD early</b><span class="pill bad">Early CD</span></div><p class="muted">${cd ? `Put in ${money(cd.amount)}. With the ${cfg('cdPenalty')}% penalty they get ${money(Math.round(cd.amount * (100 - cfg('cdPenalty')) / 100))}.` : 'That CD is gone.'}</p><div class="row"><button class="btn" data-act="tellerDone" data-id="${r.id}">Cash it out</button><button class="btn ghost" data-act="tellerDecline" data-id="${r.id}">Decline</button></div></div>`; }
+      if (r.kind === 'mortgage') { const h = homes()[r.homeIdx] || {}, cr = credit(r.playerId), down = Math.round((h.price || 0) * cfg('downPct') / 100); return `<div class="shop"><div class="panel-head"><b>${who} wants a mortgage for the ${esc(h.name || 'home')}</b><span class="pill ${cr.band[1]}">Credit ${cr.score}</span></div>
+        <p class="muted">Price ${money(h.price)} · down payment ${money(down)} · checking has ${money(c)} · loan ${money((h.price || 0) - down)} at ${cfg('mortgageRate')}% · payment ${money(mortgagePayment((h.price || 0) - down, cfg('mortgageRate'), every('mortgageTerm')))} × ${every('mortgageTerm')}</p>
+        ${cr.score < 580 ? '<p class="neg">Credit score is below 580. You can still approve it, but a real bank would say no.</p>' : ''}
+        <div class="row"><button class="btn" data-act="tellerDone" data-id="${r.id}">Approve mortgage</button><button class="btn ghost" data-act="tellerDecline" data-id="${r.id}">Decline</button></div></div>`; }
+      return '';
+    };
     return `<div class="cols"><div class="stack">
-      <section class="panel"><h3>Loan requests</h3>${req.length ? req.map(l => { const c = credit(l.playerId); return `<div class="shop">
-        <div class="panel-head"><b>${esc(nameOf(l.playerId))} wants ${money(l.amount)}</b><span class="pill ${c.band[1]}">Credit ${c.score}</span></div>
-        <p class="muted">For: ${esc(l.purpose)} · can borrow up to ${money(c.avail)} · ${when(l.at)}</p>
+      <section class="panel"><h3>Customers waiting</h3>${waiting.length || req.length ? waiting.map(card).join('') + req.map(l => { const c = credit(l.playerId); return `<div class="shop">
+        <div class="panel-head"><b>${esc(nameOf(l.playerId))} wants a ${money(l.amount)} loan</b><span class="pill ${c.band[1]}">Credit ${c.score}</span></div>
+        <p class="muted">For: ${esc(l.purpose)} · can borrow up to ${money(c.avail)}</p>
         <form class="inline" data-form="approve" data-id="${l.id}"><label>Interest % every ${every('interestEvery')} days<input id="la-${l.id}" inputmode="decimal" value="${l.rate}"></label>
-          <button class="btn">Approve</button><button type="button" class="btn ghost" data-act="decline" data-id="${l.id}">Decline</button></form></div>`; }).join('') : '<div class="empty">No requests waiting.</div>'}</section>
+          <button class="btn">Approve</button><button type="button" class="btn ghost" data-act="decline" data-id="${l.id}">Decline</button></form></div>`; }).join('') : '<div class="empty">Nobody in line. The kids send requests from their Bank & credit tab.</div>'}</section>
     </div><div class="stack">
-      <section class="panel"><h3>Active loans</h3>${act.length ? `<div class="tbl-wrap"><table><thead><tr><th>Resident</th><th>For</th><th class="r">Balance</th><th class="r">Rate</th><th class="r">Missed</th><th></th></tr></thead><tbody>
-        ${act.map(l => `<tr><td><b>${esc(nameOf(l.playerId))}</b></td><td>${esc(l.purpose)}</td><td class="r num">${money(l.balance)}</td><td class="r">${l.rate}%</td><td class="r">${l.missed || 0}</td><td class="r"><button class="btn danger sm" data-act="missed" data-id="${l.id}">Missed payment</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No active loans.</div>'}
-        <p class="muted" style="font-size:.85rem">Interest is added automatically every ${every('interestEvery')} days when you advance the day.</p></section></div></div>`;
+      <section class="panel"><h3>Active loans</h3>${act.length ? `<div class="list">${act.map(l => `<div class="li"><div class="main"><b>${esc(nameOf(l.playerId))} · ${money(l.balance)}</b><small>${esc(l.purpose)} · ${l.rate}% · missed ${l.missed || 0}</small></div><button class="btn danger sm" data-act="missed" data-id="${l.id}">Missed payment</button></div>`).join('')}</div>` : '<div class="empty">No active loans.</div>'}</section>
+      <section class="panel"><h3>Mortgages</h3>${mortgages.length ? `<div class="list">${mortgages.map(p => `<div class="li"><div class="main"><b>${esc(p.name)} · ${esc(p.home.name)}</b><small>Owes ${money(p.home.balance)} · pays ${money(p.home.payment)} every ${every('rentEvery')} days</small></div></div>`).join('')}</div>` : '<div class="empty">No mortgages.</div>'}</section>
+      <section class="panel"><h3>Open CDs</h3>${cds.length ? `<div class="list">${cds.map(c => `<div class="li"><div class="main"><b>${esc(nameOf(c.playerId))} · ${money(c.amount)}</b><small>Pays ${money(c.payout)} on Day ${c.matureDay}</small></div></div>`).join('')}</div>` : '<div class="empty">No open CDs.</div>'}</section>
+    </div></div>`;
   }
   if (S.tab === 'people') {
     return `<div class="cols"><div class="stack"><section class="panel"><h3>Residents</h3>
@@ -639,30 +894,42 @@ function bankView() {
   }
   if (S.tab === 'shops') {
     const shops = Object.values(S.shops);
-    return `<section class="panel"><h3>Businesses on Main Street</h3>${shops.length ? `<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Type</th><th>Owner</th><th class="r">Items</th><th class="r">Sales</th><th class="r">Open orders</th><th></th></tr></thead><tbody>
-      ${shops.map(s => { const os = S.orders.filter(o => o.shopId === s.id); return `<tr><td><b>${esc(s.name)}</b></td><td>${BIZ[bizType(s)].Noun}</td><td>${esc(nameOf(s.ownerId))}</td><td class="r">${Object.values(S.items).filter(i => i.shopId === s.id).length}</td><td class="r num">${money(os.filter(o => o.status !== 'refunded').reduce((a, o) => a + o.total, 0))}</td><td class="r">${os.filter(o => o.status === 'new').length}</td><td class="r"><button class="btn danger sm" data-act="closeShop" data-id="${s.id}">Close</button></td></tr>`; }).join('')}
+    return `<section class="panel"><h3>Businesses on Main Street</h3>${shops.length ? `<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Owner</th><th class="r">Sales</th><th class="r">Share price</th><th class="r">Open orders</th><th></th></tr></thead><tbody>
+      ${shops.map(s => { const os = S.orders.filter(o => o.shopId === s.id); return `<tr><td><b>${esc(s.name)}</b><br><small class="muted">${BIZ[bizType(s)].Noun}${salePct(s) ? ' · ' + salePct(s) + '% off' : ''}</small></td><td>${esc(nameOf(s.ownerId))}</td><td class="r num">${money(os.filter(o => o.status !== 'refunded').reduce((a, o) => a + o.total, 0))}</td><td class="r num">${money(sharePrice(s.id))}</td><td class="r">${os.filter(o => o.status === 'new').length}</td><td class="r"><button class="btn danger sm" data-act="closeShop" data-id="${s.id}">Close</button></td></tr>`; }).join('')}
       </tbody></table></div>` : '<div class="empty">No businesses yet. Kids open shops and restaurants from their My businesses tab.</div>'}</section>`;
   }
   if (S.tab === 'settings') {
-    const s = S.settings, ut = utilities(), rows = [0, 1, 2, 3].map(i => ut[i] || {name: '', amount: 0});
-    return `<form data-form="settings" style="max-width:760px;display:grid;gap:20px">
+    const s = S.settings, ut = utilities(), rows = [0, 1, 2, 3].map(i => ut[i] || {name: '', amount: 0}), hs = homes(), hrows = [0, 1, 2, 3].map(i => hs[i] || {name: '', rent: 0, price: 0});
+    const c2 = v => v ? (v / 100).toFixed(2) : '';
+    return `<form data-form="settings" style="max-width:820px;display:grid;gap:20px">
       <section class="panel"><h3>Town</h3><div class="fields">
         <label>Town name<input id="st-name" value="${esc(s.name)}" required maxlength="40"></label>
         <label>Money symbol<input id="st-sym" value="${esc(s.symbol || '$')}" maxlength="3"></label>
         <label>Banker PIN<input id="st-pin" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" value="${esc(s.bankerPin || '')}" required></label>
-        <label>Current day<input id="st-day" type="number" min="1" value="${today()}"></label></div></section>
+        <label>Current day<input id="st-day" type="number" min="1" value="${today()}"></label>
+        <label>Chance of a town event each day (%)<input id="st-ev" type="number" min="0" max="100" value="${Math.round(cfg('eventChance'))}"></label></div></section>
       <section class="panel"><h3>Schedule</h3><div class="fields">
         <label>Payday every (days)<input id="st-payev" type="number" min="1" value="${every('payEvery')}"></label>
-        <label>Bills every (days)<input id="st-billev" type="number" min="1" value="${every('billEvery')}"></label>
+        <label>Utility bills every (days)<input id="st-billev" type="number" min="1" value="${every('billEvery')}"></label>
+        <label>Rent & mortgage every (days)<input id="st-rentev" type="number" min="1" value="${every('rentEvery')}"></label>
         <label>Days to pay a bill<input id="st-grace" type="number" min="0" value="${Math.round(cfg('billGrace'))}"></label>
         <label>Interest every (days)<input id="st-intev" type="number" min="1" value="${every('interestEvery')}"></label></div></section>
       <section class="panel"><h3>Rates</h3><div class="fields">
         <label>Town tax on pay (%)<input id="st-tax" inputmode="decimal" value="${cfg('taxRate')}"></label>
         <label>Savings interest (%)<input id="st-sav" inputmode="decimal" value="${cfg('savingsRate')}"></label>
         <label>Default loan interest (%)<input id="st-loan" inputmode="decimal" value="${cfg('loanRate')}"></label>
-        <label>Late fee per bill<input id="st-late" inputmode="decimal" value="${(cfg('lateFee') / 100).toFixed(2)}"></label></div></section>
+        <label>Late fee per bill<input id="st-late" inputmode="decimal" value="${c2(cfg('lateFee'))}"></label>
+        <label>CD interest for the whole term (%)<input id="st-cdr" inputmode="decimal" value="${cfg('cdRate')}"></label>
+        <label>CD length (days)<input id="st-cdd" type="number" min="1" value="${every('cdDays')}"></label>
+        <label>Early CD penalty (%)<input id="st-cdp" inputmode="decimal" value="${cfg('cdPenalty')}"></label></div></section>
+      <section class="panel"><h3>Homes</h3><div class="fields">
+        <label>Mortgage interest per period (%)<input id="st-mr" inputmode="decimal" value="${cfg('mortgageRate')}"></label>
+        <label>Mortgage length (payments)<input id="st-mt" type="number" min="1" value="${every('mortgageTerm')}"></label>
+        <label>Down payment (%)<input id="st-dp" inputmode="decimal" value="${cfg('downPct')}"></label></div>
+        <p class="muted" style="font-size:.88rem">Leave a name blank to remove that home. Changes apply to people who move in later.</p>
+        ${hrows.map((h, i) => `<div class="fields"><label>Home<input id="hm-n-${i}" value="${esc(h.name)}" maxlength="30"></label><label>Rent<input id="hm-r-${i}" inputmode="decimal" value="${c2(h.rent)}"></label><label>Price to buy<input id="hm-p-${i}" inputmode="decimal" value="${c2(h.price)}"></label></div>`).join('')}</section>
       <section class="panel"><h3>Utility bill</h3><p class="muted" style="font-size:.88rem">Every resident gets this bill. Leave a name blank to drop that line.</p>
-        ${rows.map((u, i) => `<div class="fields"><label>Utility<input id="ut-n-${i}" value="${esc(u.name)}" maxlength="24"></label><label>Amount<input id="ut-a-${i}" inputmode="decimal" value="${u.amount ? (u.amount / 100).toFixed(2) : ''}"></label></div>`).join('')}</section>
+        ${rows.map((u, i) => `<div class="fields"><label>Utility<input id="ut-n-${i}" value="${esc(u.name)}" maxlength="24"></label><label>Amount<input id="ut-a-${i}" inputmode="decimal" value="${c2(u.amount)}"></label></div>`).join('')}</section>
       <div><button class="btn">Save settings</button></div></form>`;
   }
   return '';
@@ -684,7 +951,7 @@ const confirmIt = (title, body, ok, fn, danger) => { S.modal = {title, body, ok,
 
 // ---------- actions ----------
 function enter(target) {
-  S.pin = null; S.me = target; S.tab = null;
+  S.pin = null; S.me = target; S.tab = null; S.thread = null;
   if (target !== 'bank') ls('ptb.me', target); else ls('ptb.me', null);
   window.scrollTo(0, 0); render();
 }
@@ -703,54 +970,68 @@ const acts = {
   },
   digitBack: () => { if (S.pin) { S.pin.digits = S.pin.digits.slice(0, -1); render(); } },
   pinCancel: () => { S.pin = null; render(); },
-  switch: () => { S.me = null; ls('ptb.me', null); render(); },
+  switch: () => { S.me = null; S.thread = null; ls('ptb.me', null); render(); },
+  openThread: id => { S.thread = id; markRead(id); render(); setTimeout(() => document.getElementById('msg-text')?.focus(), 50); },
+  closeThread: () => { S.thread = null; render(); },
   tab: id => { S.tab = id; window.scrollTo(0, 0); render(); },
   modalNo: () => { S.modal = null; render(); },
   modalYes: () => { const f = S.modal?.fn; S.modal = null; render(); if (f) run(f); },
   advance: () => {
     const d = today() + 1;
-    confirmIt(`Advance to Day ${d}?`, 'Everything scheduled for that day runs now: paydays, bills, interest and late fees. This can’t be undone.', `Start Day ${d}`, async () => {
+    confirmIt(`Advance to Day ${d}?`, 'Everything scheduled for that day runs now: paydays, bills, rent, interest, CDs and late fees, plus maybe a town event. This can’t be undone.', `Start Day ${d}`, async () => {
       const patch = {}, done = [];
       const late = await markLate(d); if (late) done.push(late);
+      const cd = await doCds(d); if (cd) done.push(cd);
       if (d % every('payEvery') === 0) { const r = await doPayday(patch); if (r) done.push(r); }
-      if (d % every('billEvery') === 0) { const r = await doBills(d); if (r) done.push(r); }
+      if (d % every('billEvery') === 0) { const r = await doUtilities(d); if (r) done.push(r); }
+      if (d % every('rentEvery') === 0) { const r = await doHousing(d); if (r) done.push(r); }
       if (d % every('interestEvery') === 0) { const r = await doInterest(patch); if (r) done.push(r); }
+      if (Math.random() * 100 < cfg('eventChance')) { const r = await drawEvent(d, patch); if (r) done.push(r); }
       patch.day = d;
       await db.doc('town/settings').update(patch);
       toast(`Good morning, Day ${d}!` + (done.length ? ' ' + done.join(', ') + '.' : ''));
     });
   },
   runNow: what => {
-    const label = {pay: 'Run a payday now?', bills: 'Send utility bills now?', interest: 'Run interest now?'}[what];
+    const label = {pay: 'Run a payday now?', bills: 'Send utility bills now?', interest: 'Run interest now?', event: 'Draw a town event card?'}[what];
     confirmIt(label, 'This happens right away and doesn’t change the day or the schedule.', 'Do it', async () => {
       const patch = {};
       if (what === 'pay') { if (!(await doPayday(patch))) fail('Nobody has a wage yet.'); }
-      if (what === 'bills') { if (!(await doBills(today()))) fail('Add residents and utility amounts first.'); }
+      if (what === 'bills') { if (!(await doUtilities(today()))) fail('Add residents and utility amounts first.'); }
       if (what === 'interest') await doInterest(patch);
+      if (what === 'event') { if (!(await drawEvent(today(), patch))) fail('Add residents first.'); }
       if (Object.keys(patch).length) await db.doc('town/settings').update(patch);
-      toast('Done');
+      toast(what === 'event' ? patch.event.title + ': ' + patch.event.text : 'Done');
     });
   },
   payBill: id => run(async () => {
     const x = S.bills.find(y => y.id === id); if (!x || (x.status !== 'due' && x.status !== 'late')) fail('That bill is already paid.');
     if (bal(balances(), S.me, 'c') < x.total) fail(`Not enough in checking. You need ${money(x.total)}.`);
-    await addTx(S.me + '.c', 'bank', x.total, 'bill', `Utility bill from Day ${x.issuedDay}` + (x.status === 'late' ? ' (late)' : ''));
+    await addTx(S.me + '.c', 'bank', x.total, x.kind === 'rent' || x.kind === 'mortgage' ? 'rent' : 'bill', `${x.label || 'Utilities'} bill from Day ${x.issuedDay}` + (x.status === 'late' ? ' (late)' : ''));
     await db.doc('bills/' + id).update({status: x.status === 'late' ? 'paidLate' : 'paid', paidDay: today(), paidAt: Date.now()});
-    toast(x.status === 'late' ? 'Bill paid. Try to pay on time next time.' : 'Bill paid on time. Your credit score went up.');
+    let extra = '';
+    const h = S.players[S.me]?.home;
+    if (x.kind === 'mortgage' && h && h.mode === 'mortgage') {
+      const interest = Math.round(h.balance * h.rate / 100), principal = Math.max(0, (x.base || 0) - interest), left = Math.max(0, h.balance - principal);
+      await db.doc('players/' + S.me).update({home: {...h, balance: left, mode: left <= 0 ? 'own' : 'mortgage'}});
+      extra = left <= 0 ? ' You own your home now!' : ` ${money(principal)} went toward your home.`;
+    }
+    toast((x.status === 'late' ? 'Bill paid. Try to pay on time next time.' : 'Bill paid on time. Your credit score went up.') + extra);
   }),
   buy: id => run(async () => {
     const it = S.items[id]; if (!it) fail('That item is gone.');
     const shop = S.shops[it.shopId]; if (!shop) fail('That business closed.');
-    const isR = bizType(shop) === 'restaurant';
+    const isR = bizType(shop) === 'restaurant', pct = salePct(shop), unit = priceNow(it, shop);
     const qty = parseInt(val('q-' + id), 10); if (!(qty >= 1)) fail('Choose how many.');
     if (it.stock != null && it.stock < qty) fail(`Only ${it.stock} left.`);
-    const sub = it.price * qty, tipPct = isR ? (parseFloat(val('tip-' + shop.id)) || 0) : 0, tip = Math.round(sub * tipPct / 100), total = sub + tip;
+    const sub = unit * qty, tipPct = isR ? (parseFloat(val('tip-' + shop.id)) || 0) : 0, tip = Math.round(sub * tipPct / 100), total = sub + tip;
     if (bal(balances(), S.me, 'c') < total) fail(`Not enough in checking. You need ${money(total)}.`);
-    await addTx(S.me + '.c', shop.ownerId + '.c', total, isR ? 'meal' : 'purchase', `${qty} × ${it.name} at ${shop.name}` + (tip ? ` + ${money(tip)} tip` : ''));
+    await addTx(S.me + '.c', shop.ownerId + '.c', total, isR ? 'meal' : 'purchase', `${qty} × ${it.name} at ${shop.name}` + (pct ? ` (${pct}% off)` : '') + (tip ? ` + ${money(tip)} tip` : ''));
     if (it.stock != null) await db.doc('items/' + id).update({stock: it.stock - qty});
-    await db.collection('orders').add({shopId: shop.id, bizType: bizType(shop), itemId: id, itemName: it.name, qty, price: it.price, tip, total, buyerId: S.me, sellerId: shop.ownerId, status: 'new', day: today(), at: Date.now()});
-    clear('q-' + id); toast(`Ordered ${qty} × ${it.name}`);
+    await db.collection('orders').add({shopId: shop.id, bizType: bizType(shop), itemId: id, itemName: it.name, qty, price: unit, salePct: pct, tip, total, buyerId: S.me, sellerId: shop.ownerId, status: 'new', day: today(), at: Date.now()});
+    clear('q-' + id); toast(`Ordered ${qty} × ${it.name}` + (pct ? ` and saved ${money((it.price - unit) * qty)}` : ''));
   }),
+  endSale: id => run(async () => { await db.doc('shops/' + id).update({sale: null}); toast('Sale ended'); }),
   deliver: id => run(async () => { const o = S.orders.find(x => x.id === id); await db.doc('orders/' + id).update({status: 'done'}); toast(o?.bizType === 'restaurant' ? 'Marked served' : 'Marked delivered'); }),
   refund: id => {
     const o = S.orders.find(x => x.id === id); if (!o) return;
@@ -763,10 +1044,108 @@ const acts = {
     });
   },
   removeItem: id => confirmIt('Remove this?', `${S.items[id]?.name || 'It'} will come off the list.`, 'Remove', async () => { await db.doc('items/' + id).delete(); }, true),
-  closeShop: id => confirmIt(`Close ${S.shops[id]?.name || 'this business'}?`, 'Its items come off Main Street. Past sales stay in the records.', 'Close it', async () => {
+  closeShop: id => confirmIt(`Close ${S.shops[id]?.name || 'this business'}?`, 'Its items come off Main Street. Past sales stay in the records, and investors keep their shares.', 'Close it', async () => {
     for (const i of Object.values(S.items).filter(i => i.shopId === id)) await db.doc('items/' + i.id).delete();
     await db.doc('shops/' + id).delete(); toast('Closed');
   }, true),
+  buyStock: shopId => run(async () => {
+    const shop = S.shops[shopId]; if (!shop) fail('That business closed.');
+    if (shop.ownerId === S.me) fail('You can’t buy shares in your own business.');
+    const n = parseInt(val('sb-' + shopId), 10); if (!(n >= 1)) fail('Choose how many shares.');
+    const left = SHARES - sharesOut(shopId); if (n > left) fail(`Only ${left} share${left === 1 ? '' : 's'} left.`);
+    const pr = sharePrice(shopId), cost = pr * n;
+    if (bal(balances(), S.me, 'c') < cost) fail(`Not enough in checking. ${n} share${n > 1 ? 's' : ''} cost ${money(cost)}.`);
+    await addTx(S.me + '.c', 'bank', cost, 'stock', `Bought ${n} share${n > 1 ? 's' : ''} of ${shop.name} at ${money(pr)}`);
+    const hid = S.me + '_' + shopId, h = S.holdings.find(x => x.id === hid);
+    await db.doc('holdings/' + hid).set({playerId: S.me, shopId, shares: (h?.shares || 0) + n, cost: (h?.cost || 0) + cost});
+    clear('sb-' + shopId); toast(`You own ${(h?.shares || 0) + n} share${(h?.shares || 0) + n > 1 ? 's' : ''} of ${shop.name}`);
+  }),
+  sellStock: shopId => run(async () => {
+    const hid = S.me + '_' + shopId, h = S.holdings.find(x => x.id === hid); if (!h || !h.shares) fail('You don’t own any.');
+    const n = parseInt(val('ss-' + shopId), 10); if (!(n >= 1 && n <= h.shares)) fail(`Choose 1 to ${h.shares} shares.`);
+    const pr = sharePrice(shopId), got = pr * n, costPart = Math.round((h.cost || 0) * n / h.shares);
+    await addTx('bank', S.me + '.c', got, 'stock', `Sold ${n} share${n > 1 ? 's' : ''} of ${S.shops[shopId]?.name || 'a closed business'} at ${money(pr)}`);
+    await db.doc('holdings/' + hid).set({playerId: S.me, shopId, shares: h.shares - n, cost: Math.max(0, (h.cost || 0) - costPart)});
+    clear('ss-' + shopId);
+    toast(got >= costPart ? `Sold for a ${money(got - costPart)} profit` : `Sold at a ${money(costPart - got)} loss`);
+  }),
+  rentHome: i => {
+    const x = homes()[i]; if (!x) return;
+    confirmIt(`Rent the ${x.name}?`, `You pay ${money(x.rent)} now to move in, then ${money(x.rent)} every ${every('rentEvery')} days.`, 'Move in', async () => {
+      if (S.players[S.me]?.home) fail('Move out of your current home first.');
+      if (bal(balances(), S.me, 'c') < x.rent) fail(`You need ${money(x.rent)} in checking to move in.`);
+      await addTx(S.me + '.c', 'bank', x.rent, 'rent', `First rent · ${x.name}`);
+      await db.doc('players/' + S.me).update({home: {name: x.name, mode: 'rent', rent: x.rent, price: x.price}});
+      toast(`Welcome home to your ${x.name}!`);
+    });
+  },
+  buyCash: i => {
+    const x = homes()[i]; if (!x) return;
+    confirmIt(`Buy the ${x.name} with cash?`, `${money(x.price)} comes out of checking. You’ll never pay rent or a mortgage on it.`, 'Buy it', async () => {
+      if (S.players[S.me]?.home) fail('Move out of your current home first.');
+      if (bal(balances(), S.me, 'c') < x.price) fail(`You need ${money(x.price)} in checking. Try a mortgage instead.`);
+      await addTx(S.me + '.c', 'bank', x.price, 'home', `Bought the ${x.name}`);
+      await db.doc('players/' + S.me).update({home: {name: x.name, mode: 'own', rent: x.rent, price: x.price}});
+      toast(`You own the ${x.name}!`);
+    });
+  },
+  applyMortgage: i => run(async () => {
+    const x = homes()[i]; if (!x) fail('That home is gone.');
+    if (S.players[S.me]?.home) fail('Move out of your current home first.');
+    if (tellerOf(S.me).some(t => t.kind === 'mortgage' && t.status === 'waiting')) fail('You already have a mortgage application waiting.');
+    const down = Math.round(x.price * cfg('downPct') / 100);
+    if (bal(balances(), S.me, 'c') < down) fail(`You need ${money(down)} in checking for the down payment.`);
+    await db.collection('teller').add({playerId: S.me, kind: 'mortgage', homeIdx: Number(i), amount: x.price, status: 'waiting', day: today(), at: Date.now()});
+    toast('Application sent. Go see the banker!');
+  }),
+  moveOut: () => {
+    const h = S.players[S.me]?.home; if (!h) return;
+    const body = h.mode === 'rent' ? 'You’ll stop paying rent and need a new place to live.'
+      : h.mode === 'own' ? `The bank buys your home for ${money(h.price)}.`
+      : `The bank buys your home for ${money(h.price)} and keeps ${money(h.balance)} to pay off the mortgage, so you get ${money(h.price - h.balance)}.`;
+    confirmIt(h.mode === 'rent' ? 'Move out?' : 'Sell your home?', body, h.mode === 'rent' ? 'Move out' : 'Sell it', async () => {
+      if (h.mode === 'own') await addTx('bank', S.me + '.c', h.price, 'home', `Sold the ${h.name}`);
+      if (h.mode === 'mortgage') { const net = h.price - h.balance; if (net > 0) await addTx('bank', S.me + '.c', net, 'home', `Sold the ${h.name} and paid off the mortgage`); if (net < 0) await addTx(S.me + '.c', 'bank', -net, 'home', `Sold the ${h.name}; mortgage was more than the price`); }
+      await db.doc('players/' + S.me).update({home: null});
+      toast('Moved out');
+    }, true);
+  },
+  cdEarly: id => run(async () => {
+    if (S.teller.some(t => t.cdId === id && t.status === 'waiting')) fail('That request is already waiting at the teller window.');
+    const c = S.cds.find(x => x.id === id); if (!c || c.status !== 'open') fail('That CD is closed.');
+    await db.collection('teller').add({playerId: S.me, kind: 'cdclose', cdId: id, amount: c.amount, status: 'waiting', day: today(), at: Date.now()});
+    toast('Request sent. Go see the banker.');
+  }),
+  cancelTeller: id => run(async () => { await db.doc('teller/' + id).update({status: 'declined'}); toast('Request canceled'); }),
+  tellerDecline: id => run(async () => { await db.doc('teller/' + id).update({status: 'declined'}); toast('Declined'); }),
+  tellerDone: id => run(async () => {
+    const r = S.teller.find(x => x.id === id); if (!r || r.status !== 'waiting') fail('That request is already handled.');
+    const pid = r.playerId, c = bal(balances(), pid, 'c'), who = nameOf(pid);
+    if (r.kind === 'withdraw') { if (c < r.amount) fail(`${who} only has ${money(c)} in checking.`); await addTx(pid + '.c', 'bank', r.amount, 'cash', 'Cash withdrawal at the teller window'); }
+    if (r.kind === 'deposit') await addTx('bank', pid + '.' + (r.acct === 's' ? 's' : 'c'), r.amount, 'cash', 'Cash deposit at the teller window');
+    if (r.kind === 'cd') {
+      if (c < r.amount) fail(`${who} only has ${money(c)} in checking.`);
+      const payout = Math.round(r.amount * (100 + cfg('cdRate')) / 100);
+      await addTx(pid + '.c', 'bank', r.amount, 'cd', `Opened a CD: ${money(r.amount)} for ${every('cdDays')} days`);
+      await db.collection('cds').add({playerId: pid, amount: r.amount, rate: cfg('cdRate'), payout, openDay: today(), matureDay: today() + every('cdDays'), status: 'open', at: Date.now()});
+    }
+    if (r.kind === 'cdclose') {
+      const cd = S.cds.find(x => x.id === r.cdId); if (!cd || cd.status !== 'open') fail('That CD is already closed.');
+      const back = Math.round(cd.amount * (100 - cfg('cdPenalty')) / 100);
+      await addTx('bank', pid + '.c', back, 'cd', `Cashed out a CD early (${cfg('cdPenalty')}% penalty)`);
+      await db.doc('cds/' + cd.id).update({status: 'closed'});
+    }
+    if (r.kind === 'mortgage') {
+      const x = homes()[r.homeIdx]; if (!x) fail('That home no longer exists in Settings.');
+      if (S.players[pid]?.home) fail(`${who} already has a home.`);
+      const down = Math.round(x.price * cfg('downPct') / 100), P = x.price - down;
+      if (c < down) fail(`${who} needs ${money(down)} in checking for the down payment.`);
+      await addTx(pid + '.c', 'bank', down, 'home', `Down payment on the ${x.name}`);
+      await db.doc('players/' + pid).update({home: {name: x.name, mode: P > 0 ? 'mortgage' : 'own', rent: x.rent, price: x.price, balance: P, rate: cfg('mortgageRate'), payment: mortgagePayment(P, cfg('mortgageRate'), every('mortgageTerm'))}});
+    }
+    await db.doc('teller/' + id).update({status: 'done', doneDay: today()});
+    toast({withdraw: `Handed ${who} ${money(r.amount)} in cash`, deposit: `Deposited ${money(r.amount)} for ${who}`, cd: `CD opened for ${who}`, cdclose: `CD cashed out for ${who}`, mortgage: `Mortgage approved. ${who} has a new home!`}[r.kind]);
+  }),
   decline: id => run(async () => { await db.doc('loans/' + id).update({status: 'declined'}); toast('Loan declined'); }),
   missed: id => confirmIt('Record a missed payment?', `This lowers ${nameOf(S.loans[id]?.playerId)}'s credit score by 60 points.`, 'Record it', async () => {
     await db.doc('loans/' + id).update({missed: (S.loans[id].missed || 0) + 1}); toast('Missed payment recorded');
@@ -779,7 +1158,7 @@ const acts = {
 const forms = {
   setup: async () => {
     const pin = val('su-pin'); if (!/^\d{4}$/.test(pin)) fail('The banker PIN needs 4 digits.');
-    await db.doc('town/settings').set({name: val('su-name').trim(), symbol: val('su-sym').trim() || '$', bankerPin: pin, ...DEFAULTS, utilities: DEFAULT_UTIL, paydays: 0, createdAt: Date.now()});
+    await db.doc('town/settings').set({name: val('su-name').trim(), symbol: val('su-sym').trim() || '$', bankerPin: pin, ...DEFAULTS, utilities: DEFAULT_UTIL, homes: DEFAULT_HOMES, paydays: 0, createdAt: Date.now()});
     S.me = 'bank'; S.tab = 'people'; toast('Your bank is open. Add your residents.');
   },
   check: async () => {
@@ -790,6 +1169,12 @@ const forms = {
     await addTx(S.me + '.c', to + '.c', amt, 'check', val('ck-memo').trim() || 'Check to ' + nameOf(to));
     clear('ck-to', 'ck-amt', 'ck-memo'); toast(`Check sent to ${nameOf(to)}`);
   },
+  sendMsg: async to => {
+    const t = val('msg-text').trim(); if (!t) fail('Type a message first.');
+    if (to !== 'board' && to !== 'bank' && !S.players[to]) fail('That person left town.');
+    await db.collection('messages').add({from: S.me, to, text: t.slice(0, 300), day: today(), at: Date.now()});
+    clear('msg-text');
+  },
   move: async () => {
     const dir = val('mv-dir'), amt = toCents(val('mv-amt')), from = dir === 's' ? 'c' : 's';
     if (!(amt > 0)) fail('Enter an amount bigger than zero.');
@@ -797,10 +1182,34 @@ const forms = {
     await addTx(S.me + '.' + from, S.me + '.' + dir, amt, 'move', dir === 's' ? 'Moved to savings' : 'Moved to checking');
     clear('mv-amt'); toast('Money moved');
   },
+  tellerReq: async kind => {
+    const ids = {withdraw: 'tw-amt', deposit: 'td-amt', cd: 'tc-amt'}, amt = toCents(val(ids[kind]));
+    if (!(amt > 0)) fail('Enter an amount bigger than zero.');
+    if (kind !== 'deposit' && bal(balances(), S.me, 'c') < amt) fail('Not enough in checking.');
+    await db.collection('teller').add({playerId: S.me, kind, amount: amt, acct: kind === 'deposit' ? val('td-acct') : 'c', status: 'waiting', day: today(), at: Date.now()});
+    clear(ids[kind]); toast(kind === 'deposit' ? 'Bring your cash to the banker!' : 'Request sent. Go see the banker!');
+  },
+  extraPrincipal: async () => {
+    const h = S.players[S.me]?.home, amt = toCents(val('xp-amt'));
+    if (!h || h.mode !== 'mortgage') fail('You don’t have a mortgage.');
+    if (!(amt > 0)) fail('Enter an amount.');
+    if (amt > h.balance) fail(`You only owe ${money(h.balance)}.`);
+    if (bal(balances(), S.me, 'c') < amt) fail('Not enough in checking.');
+    await addTx(S.me + '.c', 'bank', amt, 'home', `Extra mortgage payment · ${h.name}`);
+    const left = h.balance - amt;
+    await db.doc('players/' + S.me).update({home: {...h, balance: left, mode: left <= 0 ? 'own' : 'mortgage'}});
+    clear('xp-amt'); toast(left <= 0 ? 'Mortgage paid off. You own your home!' : `Now you owe ${money(left)}`);
+  },
   openBiz: async t => {
     if (Object.values(S.shops).some(s => s.ownerId === S.me && bizType(s) === t)) fail(`You already have a ${BIZ[t].noun}.`);
     await db.collection('shops').add({type: t, name: val('ob-n-' + t).trim(), desc: val('ob-d-' + t).trim(), ownerId: S.me, at: Date.now()});
     clear('ob-n-' + t, 'ob-d-' + t); toast(`Your ${BIZ[t].noun} is open`);
+  },
+  startSale: async sid => {
+    const pct = parseInt(val('sl-p-' + sid), 10), days = parseInt(val('sl-d-' + sid), 10);
+    if (!(pct > 0 && pct < 100) || !(days >= 1)) fail('Pick a discount and how long.');
+    await db.doc('shops/' + sid).update({sale: {pct, untilDay: today() + days - 1}});
+    toast(`${pct}% off sale is live on Main Street`);
   },
   addItem: async sid => {
     const shop = S.shops[sid]; if (!shop || shop.ownerId !== S.me) fail('That business is closed.');
@@ -866,20 +1275,23 @@ const forms = {
     const pin = val('st-pin'); if (!/^\d{4}$/.test(pin)) fail('The banker PIN needs 4 digits.');
     const n = (k, min = 0) => { const v = parseFloat(val(k)); return isFinite(v) && v >= min ? v : min; };
     const ints = (k, min) => Math.max(min, Math.round(n(k, min)));
-    const utilities = [0, 1, 2, 3].map(i => ({name: val('ut-n-' + i).trim(), amount: toCents(val('ut-a-' + i) || '0') || 0})).filter(u => u.name && u.amount > 0);
-    const late = toCents(val('st-late') || '0');
+    const c = k => { const v = toCents(val(k) || '0'); return v > 0 ? v : 0; };
+    const utilities = [0, 1, 2, 3].map(i => ({name: val('ut-n-' + i).trim(), amount: c('ut-a-' + i)})).filter(u => u.name && u.amount > 0);
+    const homesList = [0, 1, 2, 3].map(i => ({name: val('hm-n-' + i).trim(), rent: c('hm-r-' + i), price: c('hm-p-' + i)})).filter(h => h.name && h.price > 0);
     await db.doc('town/settings').update({
-      name: val('st-name').trim(), symbol: val('st-sym').trim() || '$', bankerPin: pin, day: ints('st-day', 1),
-      payEvery: ints('st-payev', 1), billEvery: ints('st-billev', 1), billGrace: ints('st-grace', 0), interestEvery: ints('st-intev', 1),
-      taxRate: n('st-tax'), savingsRate: n('st-sav'), loanRate: n('st-loan'), lateFee: late > 0 ? late : 0, utilities,
+      name: val('st-name').trim(), symbol: val('st-sym').trim() || '$', bankerPin: pin, day: ints('st-day', 1), eventChance: Math.min(100, n('st-ev')),
+      payEvery: ints('st-payev', 1), billEvery: ints('st-billev', 1), rentEvery: ints('st-rentev', 1), billGrace: ints('st-grace', 0), interestEvery: ints('st-intev', 1),
+      taxRate: n('st-tax'), savingsRate: n('st-sav'), loanRate: n('st-loan'), lateFee: c('st-late'), cdRate: n('st-cdr'), cdDays: ints('st-cdd', 1), cdPenalty: Math.min(100, n('st-cdp')),
+      mortgageRate: n('st-mr'), mortgageTerm: ints('st-mt', 1), downPct: Math.min(100, n('st-dp')), utilities, homes: homesList,
     });
-    clear('st-name', 'st-sym', 'st-pin', 'st-day', 'st-payev', 'st-billev', 'st-grace', 'st-intev', 'st-tax', 'st-sav', 'st-loan', 'st-late', 'ut-n-0', 'ut-n-1', 'ut-n-2', 'ut-n-3', 'ut-a-0', 'ut-a-1', 'ut-a-2', 'ut-a-3');
-    toast('Settings saved');
+    const all = ['st-name','st-sym','st-pin','st-day','st-ev','st-payev','st-billev','st-rentev','st-grace','st-intev','st-tax','st-sav','st-loan','st-late','st-cdr','st-cdd','st-cdp','st-mr','st-mt','st-dp'];
+    for (let i = 0; i < 4; i++) all.push('ut-n-' + i, 'ut-a-' + i, 'hm-n-' + i, 'hm-r-' + i, 'hm-p-' + i);
+    clear(...all); toast('Settings saved');
   },
 };
 
 app.addEventListener('click', e => {
-  const el = e.target.closest('[data-act]'); if (!el) return;
+  const el = e.target.closest('[data-act]'); if (!el || el.disabled) return;
   e.preventDefault();
   const fn = acts[el.dataset.act]; if (fn) fn(el.dataset.id);
 });
@@ -906,7 +1318,17 @@ app.addEventListener('submit', e => {
   }, onErr);
   const map = (name, key) => db.collection(name).onSnapshot(q => { const o = {}; q.docs.forEach(d => o[d.id] = {id: d.id, ...d.data()}); S[key] = o; schedule(); }, onErr);
   const list = (name, key) => db.collection(name).onSnapshot(q => { S[key] = q.docs.map(d => ({id: d.id, ...d.data()})).sort((a, b) => (b.at || 0) - (a.at || 0)); schedule(); }, onErr);
-  map('players', 'players'); list('tx', 'tx'); map('shops', 'shops'); map('items', 'items'); list('orders', 'orders'); map('loans', 'loans'); list('bills', 'bills');
+  map('players', 'players'); list('tx', 'tx'); map('shops', 'shops'); map('items', 'items'); list('orders', 'orders'); map('loans', 'loans');
+  list('bills', 'bills'); list('holdings', 'holdings'); list('teller', 'teller'); list('cds', 'cds');
+  const bootAt = Date.now() - 5000;
+  db.collection('messages').onSnapshot(q => {
+    const fresh = q.docChanges().filter(c => c.type === 'added').map(c => c.doc.data())
+      .filter(m => m.at > bootAt && S.me && m.from !== S.me && (m.to === S.me || m.to === 'board'));
+    S.messages = q.docs.map(d => ({id: d.id, ...d.data()}));
+    const m = fresh[fresh.length - 1];
+    if (m) { const key = m.to === 'board' ? 'board' : m.from; if (!(S.tab === 'messages' && S.thread === key)) toast(m.to === 'board' ? `New post on the bulletin board from ${contactName(m.from)}` : `New message from ${contactName(m.from)}`); }
+    schedule();
+  }, onErr);
   render();
 })();
 })();
