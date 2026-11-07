@@ -148,14 +148,18 @@ td.num{white-space:nowrap}
 .toast.err{background:var(--bad);color:#fff}
 .center{min-height:60vh;display:grid;place-items:center;text-align:center;padding:20px}
 @media (prefers-reduced-motion:no-preference){.acct,.panel{animation:rise .3s ease-out both}@keyframes rise{from{transform:translateY(6px)}to{transform:none}}}
+.daychip{font-family:var(--f-num);font-size:.8rem;padding:2px 8px;border-radius:999px;background:var(--coin);color:#1b1205;margin-right:6px;white-space:nowrap}
+.alert{border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 10%,var(--card));border-radius:12px;padding:12px 14px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.alert.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,var(--card))}
+.cal{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.bigday{font-family:var(--f-display);font-weight:800;font-size:3.4rem;line-height:1}
+select.tipsel{width:auto;min-height:40px;padding:6px 8px}
 </style>
 </head><body>
 <div id="app"><div class="center"><div><h2>Opening the bank…</h2><p class="muted">Counting the money.</p></div></div></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-</body></html>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-</body></html>
 <script>
 // ===== PASTE YOUR FIREBASE SETTINGS BETWEEN THE BRACES BELOW =====
 const FIREBASE_CONFIG = {
@@ -168,17 +172,23 @@ const FIREBASE_CONFIG = {
 };
 // ==================================================================
 </script>
-</body></html>
 <script>
 (() => {
 const app = document.getElementById('app');
 let db = null;
 const S = {
   dbState: 'loading', settings: undefined, settingsConfirmed: false,
-  players: {}, tx: [], shops: {}, items: {}, orders: [], loans: {},
+  players: {}, tx: [], shops: {}, items: {}, orders: [], loans: {}, bills: [],
   me: null, tab: null, modal: null, pin: null, toast: null, busy: false, err: null, slow: false,
 };
 const COLORS = ['#2F7D6B','#C0612B','#5B5BB5','#B0457A','#3C7FB0','#8A6D1F','#6C8A2E','#9C4BB3'];
+const DEFAULTS = {day: 1, payEvery: 3, billEvery: 4, billGrace: 2, interestEvery: 7, lateFee: 200, taxRate: 10, savingsRate: 2, loanRate: 5};
+const DEFAULT_UTIL = [{name: 'Electric', amount: 800}, {name: 'Water', amount: 500}, {name: 'Internet', amount: 600}];
+const BIZ = {
+  shop: {noun: 'shop', Noun: 'Shop', list: 'Price list', item: 'Item', buy: 'Buy', done: 'Delivered', waiting: 'Waiting for delivery', ph: 'Lemonade Stand', php: 'Fresh lemonade and cookies', iph: 'Cookie'},
+  restaurant: {noun: 'restaurant', Noun: 'Restaurant', list: 'Menu', item: 'Dish', buy: 'Order', done: 'Served', waiting: 'Waiting to be served', ph: 'The Hungry Moose Diner', php: 'Pancakes, burgers and milkshakes', iph: 'Cheeseburger'},
+};
+const bizType = s => (s && s.type === 'restaurant') ? 'restaurant' : 'shop';
 
 // ---------- utils ----------
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -193,7 +203,13 @@ const color = id => COLORS[hash(id) % COLORS.length];
 const initial = n => esc((n || '?').trim().charAt(0).toUpperCase());
 const fail = msg => { const e = new Error(msg); e.userMsg = msg; throw e; };
 const val = id => document.getElementById(id)?.value ?? '';
-const rate = k => Number(S.settings?.[k] ?? 0);
+const cfg = k => { const v = S.settings?.[k]; return (v == null || v === '' || !isFinite(Number(v))) ? DEFAULTS[k] : Number(v); };
+const every = k => Math.max(1, Math.round(cfg(k)));
+const today = () => Math.max(1, Math.round(cfg('day')));
+const nextOn = k => { const n = every(k); return n * (Math.floor(today() / n) + 1); };
+const utilities = () => Array.isArray(S.settings?.utilities) ? S.settings.utilities.filter(u => u && u.name && u.amount > 0) : DEFAULT_UTIL;
+const billTotal = () => utilities().reduce((s, u) => s + u.amount, 0);
+const dayIn = d => d === today() ? 'today' : d === today() + 1 ? 'tomorrow' : 'Day ' + d;
 
 function nameOf(pid) { return pid === 'bank' ? 'Town Bank' : (S.players[pid]?.name || 'Former resident'); }
 function balances() {
@@ -207,23 +223,27 @@ function balances() {
 const bal = (b, pid, a) => b[pid + '.' + a] || 0;
 const playerList = () => Object.values(S.players).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 const loansOf = pid => Object.values(S.loans).filter(l => l.playerId === pid).sort((a, b) => b.at - a.at);
+const billsOf = pid => S.bills.filter(b => b.playerId === pid);
+const openBills = pid => billsOf(pid).filter(b => b.status === 'due' || b.status === 'late');
 
 function credit(pid) {
   const p = S.players[pid] || {};
-  const ls_ = loansOf(pid);
   let paid = 0, pays = 0, missed = 0, owed = 0;
-  for (const l of ls_) {
+  for (const l of loansOf(pid)) {
     if (l.status === 'paid') paid++;
     if (l.status === 'active') owed += l.balance || 0;
     pays += l.payments || 0; missed += l.missed || 0;
   }
+  const bs = billsOf(pid);
+  const onTime = bs.filter(b => b.status === 'paid').length;
+  const late = bs.filter(b => b.status === 'late' || b.status === 'paidLate').length;
   const base = Math.max(5000, (p.wage || 0) * 3);
-  let score = 620 + paid * 40 + Math.min(100, pays * 6) - missed * 60 - Math.round(Math.min(1, owed / base) * 80);
+  let score = 620 + paid * 40 + Math.min(100, pays * 6) + Math.min(60, onTime * 5) - missed * 60 - late * 30 - Math.round(Math.min(1, owed / base) * 80);
   score = Math.max(300, Math.min(850, score));
   const band = score >= 750 ? ['Excellent', 'good'] : score >= 670 ? ['Good', 'note'] : score >= 580 ? ['Fair', 'warn'] : ['Needs work', 'bad'];
   const mult = score >= 750 ? 2 : score >= 670 ? 1.5 : score >= 580 ? 1 : .5;
   const limit = Math.round(base * mult);
-  return {score, band, limit, owed, avail: Math.max(0, limit - owed), paid, pays, missed};
+  return {score, band, limit, owed, avail: Math.max(0, limit - owed), paid, pays, missed, onTime, late};
 }
 function gauge(score, cls) {
   const f = (score - 300) / 550, a = Math.PI * (1 - f), r = 48;
@@ -235,14 +255,13 @@ function gauge(score, cls) {
     <text x="108" y="67" font-size="7" fill="var(--muted)" text-anchor="middle">850</text></svg>`;
 }
 
-const KIND = {pay:'Paycheck', check:'Check', move:'Savings transfer', purchase:'Purchase', refund:'Refund', loan:'Loan', repay:'Loan payment', interest:'Interest', adjust:'From the bank'};
+const KIND = {pay:'Paycheck', check:'Check', move:'Savings transfer', purchase:'Purchase', meal:'Restaurant', refund:'Refund', loan:'Loan', repay:'Loan payment', interest:'Interest', adjust:'From the bank', bill:'Utility bill'};
 function txRows(list, pid, limit = 15) {
   const rows = list.slice(0, limit).map(t => {
-    let delta = null, title = t.memo || KIND[t.kind] || 'Transaction';
+    let delta = null; const title = t.memo || KIND[t.kind] || 'Transaction';
     if (pid) {
       const out = t.from.startsWith(pid + '.'), inn = t.to.startsWith(pid + '.');
-      if (out && inn) delta = null;
-      else delta = inn ? t.amount : -t.amount;
+      delta = (out && inn) ? null : (inn ? t.amount : -t.amount);
     }
     const who = pid
       ? (t.kind === 'move' ? (t.to.endsWith('.s') ? 'Checking → Savings' : 'Savings → Checking')
@@ -250,7 +269,7 @@ function txRows(list, pid, limit = 15) {
       : nameOf(t.from.split('.')[0]) + ' → ' + nameOf(t.to.split('.')[0]);
     const amt = delta === null ? `<span class="amt">${money(t.amount)}</span>` : `<span class="amt ${delta > 0 ? 'pos' : 'neg'}">${money(delta, true)}</span>`;
     return `<div class="li"><span class="badge">${esc((KIND[t.kind] || 'Tx').slice(0, 3).toUpperCase())}</span>
-      <div class="main"><b>${esc(title)}</b><small>${esc(who)} · ${when(t.at)}</small></div>${amt}</div>`;
+      <div class="main"><b>${esc(title)}</b><small>${esc(who)} · ${t.day ? 'Day ' + t.day + ' · ' : ''}${when(t.at)}</small></div>${amt}</div>`;
   }).join('');
   return rows || `<div class="empty">No transactions yet.</div>`;
 }
@@ -258,9 +277,9 @@ const myTx = pid => S.tx.filter(t => t.from.startsWith(pid + '.') || t.to.starts
 
 // ---------- writes ----------
 async function addTx(from, to, amount, kind, memo, extra = {}) {
-  await db.collection('tx').add({from, to, amount, kind, memo, at: Date.now(), ...extra});
+  await db.collection('tx').add({from, to, amount, kind, memo, at: Date.now(), day: today(), ...extra});
 }
-function toast(msg, err) { S.toast = {msg, err}; clearTimeout(toast.t); toast.t = setTimeout(() => { S.toast = null; render(); }, 2800); render(); }
+function toast(msg, err) { S.toast = {msg, err}; clearTimeout(toast.t); toast.t = setTimeout(() => { S.toast = null; render(); }, 3200); render(); }
 async function run(fn) {
   if (S.busy) return;
   S.busy = true;
@@ -274,6 +293,35 @@ async function run(fn) {
 }
 const clearIds = new Set();
 const clear = (...ids) => ids.forEach(i => clearIds.add(i));
+
+// Scheduled town events. Each returns a short summary or '' and may add to the settings patch.
+async function doPayday(patch) {
+  const ps = playerList().filter(p => (p.wage || 0) > 0); if (!ps.length) return '';
+  const tr = cfg('taxRate');
+  for (const p of ps) { const tax = Math.round(p.wage * tr / 100); await addTx('bank', p.id + '.c', p.wage - tax, 'pay', `Paycheck: ${p.job || 'Wages'} (${money(p.wage)} gross, ${money(tax)} tax)`, {gross: p.wage, tax}); }
+  patch.lastPayday = Date.now(); patch.paydays = (S.settings.paydays || 0) + 1;
+  return `${ps.length} paycheck${ps.length > 1 ? 's' : ''}`;
+}
+async function doInterest(patch) {
+  const b = balances(), sr = cfg('savingsRate'); let n = 0;
+  for (const l of Object.values(S.loans).filter(l => l.status === 'active')) {
+    const i = Math.round(l.balance * l.rate / 100); if (i > 0) { await db.doc('loans/' + l.id).update({balance: l.balance + i, interest: (l.interest || 0) + i}); n++; }
+  }
+  for (const p of playerList()) { const i = Math.round(bal(b, p.id, 's') * sr / 100); if (i > 0) { await addTx('bank', p.id + '.s', i, 'interest', `Savings interest at ${sr}%`); n++; } }
+  patch.lastInterest = Date.now();
+  return 'interest';
+}
+async function doBills(day) {
+  const items = utilities(), total = items.reduce((s, u) => s + u.amount, 0); if (!total) return '';
+  const ps = playerList();
+  for (const p of ps) await db.collection('bills').add({playerId: p.id, items, total, issuedDay: day, dueDay: day + Math.max(0, Math.round(cfg('billGrace'))), status: 'due', at: Date.now()});
+  return ps.length ? 'utility bills' : '';
+}
+async function markLate(day) {
+  const fee = Math.max(0, Math.round(cfg('lateFee'))); let n = 0;
+  for (const b of S.bills.filter(b => b.status === 'due' && b.dueDay < day)) { await db.doc('bills/' + b.id).update({status: 'late', lateFee: fee, total: b.total + fee}); n++; }
+  return n ? `${n} late bill${n > 1 ? 's' : ''}` : '';
+}
 
 // ---------- render ----------
 let raf = 0;
@@ -307,9 +355,9 @@ function view() {
 const center = (h, p) => `<div class="center"><div style="display:grid;gap:8px;max-width:420px"><h2>${esc(h)}</h2><p class="muted">${esc(p)}</p></div></div>`;
 
 function viewSetup() {
-  return `<div class="pick"><div style="display:grid;gap:10px">
+  return `<div class="pick" style="padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))"><div style="display:grid;gap:10px">
     <p class="eyebrow">Open a new bank</p><h1>Let’s found your town</h1>
-    <p class="muted" style="max-width:60ch">You’ll be the banker. You run payday, approve loans and set the rules. Each kid gets a checking and savings account, a job, a credit score, and can open a shop.</p></div>
+    <p class="muted" style="max-width:60ch">You’ll be the banker. You advance the days, run payday, send utility bills, approve loans and set the rules. Each kid gets checking and savings, a job, a credit score, and can open a shop and a restaurant.</p></div>
     <form class="panel" data-form="setup">
       <div class="fields">
         <label>Town name<input id="su-name" required maxlength="40" placeholder="Maple Creek"></label>
@@ -326,7 +374,7 @@ function viewPick() {
   const tiles = ps.map(p => `<button class="person" data-act="pick" data-id="${p.id}">
       <span class="av" style="background:${color(p.id)}">${initial(p.name)}</span>${esc(p.name)}<small>${esc(p.job || 'No job yet')}</small></button>`).join('');
   return `<div class="pick" style="padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))">
-    <div style="display:grid;gap:6px"><p class="eyebrow">Welcome to</p><h1>${esc(S.settings.name)}</h1><p class="muted">Tap your name to open your accounts.</p></div>
+    <div style="display:grid;gap:6px"><p class="eyebrow">Welcome to · Day ${today()}</p><h1>${esc(S.settings.name)}</h1><p class="muted">Tap your name to open your accounts.</p></div>
     <div class="people">${tiles}
       <button class="person bank" data-act="pickBank"><span class="av">$</span>Banker<small>Grown-ups only</small></button></div>
     ${ps.length ? '' : '<div class="empty">No residents yet. The banker adds them under Residents.</div>'}
@@ -334,47 +382,76 @@ function viewPick() {
 }
 
 function shell(isBank) {
+  const myOrders = S.orders.filter(o => o.sellerId === S.me && o.status === 'new').length;
   const tabs = isBank
-    ? [['town','Town'],['payday','Payday'],['loans','Loans', Object.values(S.loans).filter(l => l.status === 'requested').length],['people','Residents'],['shops','Shops'],['settings','Settings']]
-    : [['home','Accounts'],['pay','Write a check'],['shop','Shops'],['myshop','My shop', S.orders.filter(o => o.sellerId === S.me && o.status === 'new').length],['loans','Credit & loans']];
+    ? [['town','Town'],['calendar','Day & schedule'],['loans','Loans', Object.values(S.loans).filter(l => l.status === 'requested').length],['people','Residents'],['shops','Businesses'],['settings','Settings']]
+    : [['home','Accounts'],['bills','Bills', openBills(S.me).length],['pay','Write a check'],['shop','Main Street'],['myshop','My businesses', myOrders],['loans','Credit & loans']];
   if (!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
   const who = isBank ? 'Banker mode' : nameOf(S.me) + (S.players[S.me]?.job ? ' · ' + S.players[S.me].job : '');
   const content = isBank ? bankView() : playerView();
   return `<header class="top"><div class="top-in">
       <span class="seal">${initial(S.settings.name)}</span>
-      <div class="brand"><b>${esc(S.settings.name)} Bank</b><span>${esc(who)}</span></div>
+      <div class="brand"><b>${esc(S.settings.name)} Bank</b><span><span class="daychip">Day ${today()}</span>${esc(who)}</span></div>
       <button class="btn ghost sm" data-act="switch">Switch person</button></div>
     <nav class="tabs" aria-label="Sections">${tabs.map(([k, l, n]) => `<button class="tab" data-act="tab" data-id="${k}" ${S.tab === k ? 'aria-current="page"' : ''}>${l}${n ? `<span class="dot">${n}</span>` : ''}</button>`).join('')}</nav>
   </header><main>${content}</main>`;
 }
 
 // ---------- player views ----------
+function billCard(b, pid, canPay) {
+  const late = b.status === 'late', paid = b.status === 'paid' || b.status === 'paidLate';
+  const pill = paid ? (b.status === 'paidLate' ? ['Paid late', 'warn'] : ['Paid on time', 'good']) : late ? ['Late', 'bad'] : (b.dueDay === today() ? ['Due today', 'warn'] : ['Due ' + dayIn(b.dueDay), 'note']);
+  return `<div class="shop"><div class="panel-head"><b>Utilities · Day ${b.issuedDay}</b><span class="pill ${pill[1]}">${pill[0]}</span></div>
+    <div class="list">${b.items.map(u => `<div class="li" style="padding:6px 0"><div class="main">${esc(u.name)}</div><span class="amt">${money(u.amount)}</span></div>`).join('')}
+    ${b.lateFee ? `<div class="li" style="padding:6px 0"><div class="main neg">Late fee</div><span class="amt neg">${money(b.lateFee)}</span></div>` : ''}
+    <div class="li" style="padding:6px 0"><div class="main"><b>Total</b></div><span class="amt"><b>${money(b.total)}</b></span></div></div>
+    ${!paid && canPay ? `<div class="row"><button class="btn ${late ? '' : 'gold'}" data-act="payBill" data-id="${b.id}">Pay ${money(b.total)} from checking</button></div>` : ''}</div>`;
+}
+
 function playerView() {
   const pid = S.me, p = S.players[pid], b = balances();
   if (S.tab === 'home') {
-    const cr = credit(pid);
+    const cr = credit(pid), ob = openBills(pid);
     const pendingOrders = S.orders.filter(o => o.buyerId === pid && o.status === 'new');
-    return `<div style="display:grid;gap:4px"><p class="eyebrow">Your accounts</p><h2>Hi, ${esc(p.name)}</h2></div>
+    return `<div style="display:grid;gap:4px"><p class="eyebrow">Your accounts · Day ${today()}</p><h2>Hi, ${esc(p.name)}</h2></div>
+    ${ob.length ? `<div class="alert ${ob.some(x => x.status === 'late') ? 'bad' : ''}"><span><b>${ob.length} bill${ob.length > 1 ? 's' : ''} to pay</b> · ${money(ob.reduce((s, x) => s + x.total, 0))}${ob.some(x => x.status === 'late') ? ' · late fees added' : ''}</span><button class="btn sm" data-act="tab" data-id="bills">See bills</button></div>` : ''}
     <div class="accts">
       <div class="acct"><div class="k"><span>Checking</span><span class="num">•• ${acctNo(pid + 'c')}</span></div>
-        <div class="v">${money(bal(b, pid, 'c'))}</div><div class="s">For spending, checks and shopping</div></div>
+        <div class="v">${money(bal(b, pid, 'c'))}</div><div class="s">For spending, checks, bills and shopping</div></div>
       <div class="acct sav"><div class="k"><span>Savings</span><span class="num">•• ${acctNo(pid + 's')}</span></div>
-        <div class="v">${money(bal(b, pid, 's'))}</div><div class="s">Earns ${rate('savingsRate')}% each time the bank pays interest</div></div>
+        <div class="v">${money(bal(b, pid, 's'))}</div><div class="s">Earns ${cfg('savingsRate')}% every ${every('interestEvery')} days</div></div>
     </div>
     <div class="cols"><div class="stack">
       <section class="panel"><div class="panel-head"><h3>Recent activity</h3><span class="muted" style="font-size:.85rem">${myTx(pid).length} total</span></div>
         <div class="list">${txRows(myTx(pid), pid, 20)}</div></section>
     </div><div class="stack">
+      <section class="panel"><h3>Coming up</h3><div class="list">
+        <div class="li"><span class="badge">PAY</span><div class="main"><b>Payday</b><small>Every ${every('payEvery')} days</small></div><span class="amt">${dayIn(nextOn('payEvery'))}</span></div>
+        <div class="li"><span class="badge">BIL</span><div class="main"><b>Utility bills arrive</b><small>Every ${every('billEvery')} days · about ${money(billTotal())}</small></div><span class="amt">${dayIn(nextOn('billEvery'))}</span></div>
+        <div class="li"><span class="badge">INT</span><div class="main"><b>Interest day</b><small>Savings earn, loans grow</small></div><span class="amt">${dayIn(nextOn('interestEvery'))}</span></div></div></section>
       <section class="panel"><h3>Move money</h3>
         <form data-form="move">
           <div class="fields"><label>Direction<select id="mv-dir"><option value="s">Checking → Savings</option><option value="c">Savings → Checking</option></select></label>
           <label>Amount<input id="mv-amt" inputmode="decimal" placeholder="0.00" required></label></div>
           <div><button class="btn">Move it</button></div></form></section>
       <section class="panel"><div class="panel-head"><h3>Your job</h3><span class="pill note">${esc(p.job || 'Unassigned')}</span></div>
-        <p>Paycheck: <b class="num">${money(p.wage || 0)}</b> before ${rate('taxRate')}% town tax, so <b class="num">${money((p.wage || 0) - Math.round((p.wage || 0) * rate('taxRate') / 100))}</b> lands in checking each payday.</p></section>
+        <p>Paycheck: <b class="num">${money(p.wage || 0)}</b> before ${cfg('taxRate')}% town tax, so <b class="num">${money((p.wage || 0) - Math.round((p.wage || 0) * cfg('taxRate') / 100))}</b> lands in checking each payday.</p></section>
       <section class="panel"><div class="gauge-wrap">${gauge(cr.score, cr.band[1])}<div><p class="eyebrow">Credit score</p><div class="score num">${cr.score}</div><span class="pill ${cr.band[1]}">${cr.band[0]}</span></div></div>
         <button class="btn ghost sm" data-act="tab" data-id="loans">See credit & loans</button></section>
-      ${pendingOrders.length ? `<section class="panel"><h3>Waiting for delivery</h3><div class="list">${pendingOrders.map(o => `<div class="li"><div class="main"><b>${o.qty} × ${esc(o.itemName)}</b><small>from ${esc(S.shops[o.shopId]?.name || 'a shop')}</small></div><span class="amt">${money(o.total)}</span></div>`).join('')}</div></section>` : ''}
+      ${pendingOrders.length ? `<section class="panel"><h3>On the way</h3><div class="list">${pendingOrders.map(o => `<div class="li"><div class="main"><b>${o.qty} × ${esc(o.itemName)}</b><small>${BIZ[bizType(S.shops[o.shopId] || {type: o.bizType})].waiting} · ${esc(S.shops[o.shopId]?.name || 'a business')}</small></div><span class="amt">${money(o.total)}</span></div>`).join('')}</div></section>` : ''}
+    </div></div>`;
+  }
+  if (S.tab === 'bills') {
+    const ob = openBills(pid).sort((a, c) => a.dueDay - c.dueDay);
+    const past = billsOf(pid).filter(x => x.status === 'paid' || x.status === 'paidLate').sort((a, c) => c.issuedDay - a.issuedDay);
+    return `<div class="cols"><div class="stack">
+      <div><p class="eyebrow">Day ${today()}</p><h2>Bills to pay</h2></div>
+      ${ob.length ? ob.map(x => billCard(x, pid, true)).join('') : '<div class="empty">All paid up. Nice work.</div>'}
+      <p class="muted" style="font-size:.9rem">You have <b class="num">${money(bal(b, pid, 'c'))}</b> in checking.</p>
+    </div><div class="stack">
+      <section class="panel"><h3>How bills work</h3><p class="muted">Utility bills arrive every ${every('billEvery')} days. You have ${Math.round(cfg('billGrace'))} days to pay. A late bill gets a ${money(cfg('lateFee'))} fee and lowers your credit score by 30 points. Bills paid on time raise it.</p>
+        <p>Next bills arrive <b>${dayIn(nextOn('billEvery'))}</b>.</p></section>
+      <section class="panel"><h3>Paid bills</h3>${past.length ? past.slice(0, 12).map(x => billCard(x, pid, false)).join('') : '<div class="empty">No paid bills yet.</div>'}</section>
     </div></div>`;
   }
   if (S.tab === 'pay') {
@@ -383,7 +460,7 @@ function playerView() {
     const checks = S.tx.filter(t => t.kind === 'check' && (t.from === pid + '.c' || t.to === pid + '.c'));
     return `<div class="cols"><div class="stack">
       ${others.length ? `<form class="check" data-form="check">
-        <div class="check-top"><b>${esc(S.settings.name)} Bank</b><span>No. <span class="num">${101 + checksSent}</span></span><span>${new Date().toLocaleDateString()}</span></div>
+        <div class="check-top"><b>${esc(S.settings.name)} Bank</b><span>No. <span class="num">${101 + checksSent}</span></span><span>Day ${today()}</span></div>
         <label>Pay to the order of<select id="ck-to" required><option value="">Choose a person…</option>${others.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select></label>
         <label>Amount (${esc(sym())})<input id="ck-amt" inputmode="decimal" placeholder="0.00" required></label>
         <label>Memo<input id="ck-memo" maxlength="60" placeholder="What’s it for?"></label>
@@ -394,49 +471,37 @@ function playerView() {
     </div><div class="stack"><section class="panel"><h3>Your checks</h3><div class="list">${txRows(checks, pid, 30)}</div></section></div></div>`;
   }
   if (S.tab === 'shop') {
-    const shops = Object.values(S.shops).filter(s => s.ownerId !== pid);
+    const bizs = Object.values(S.shops).filter(s => s.ownerId !== pid).sort((a, c) => bizType(a).localeCompare(bizType(c)));
     const mine = S.orders.filter(o => o.buyerId === pid).sort((a, c) => c.at - a.at);
-    const st = {new: ['Ordered', 'warn'], done: ['Delivered', 'good'], refunded: ['Refunded', 'mute']};
     return `<div class="cols"><div class="stack">
-      <div><p class="eyebrow">Main Street</p><h2>Shops in town</h2></div>
-      ${shops.length ? shops.map(s => {
-        const items = Object.values(S.items).filter(i => i.shopId === s.id);
-        return `<section class="shop"><div class="awning"></div><div class="panel-head"><h3>${esc(s.name)}</h3><span class="muted" style="font-size:.85rem">Owner: ${esc(nameOf(s.ownerId))}</span></div>
+      <div><p class="eyebrow">Main Street</p><h2>Shops & restaurants</h2></div>
+      ${bizs.length ? bizs.map(s => {
+        const T = BIZ[bizType(s)], items = Object.values(S.items).filter(i => i.shopId === s.id), isR = bizType(s) === 'restaurant';
+        return `<section class="shop"><div class="awning" ${isR ? 'style="background:repeating-linear-gradient(90deg,var(--bad) 0 18px,var(--card) 18px 36px)"' : ''}></div>
+          <div class="panel-head"><h3>${esc(s.name)}</h3><span class="muted" style="font-size:.85rem">${T.Noun} · Owner: ${esc(nameOf(s.ownerId))}</span></div>
           ${s.desc ? `<p class="muted">${esc(s.desc)}</p>` : ''}
+          ${isR && items.length ? `<label class="inline" style="display:flex;align-items:center;gap:8px">Tip for the server <select class="tipsel" id="tip-${s.id}"><option value="0">No tip</option><option value="10">10%</option><option value="15" selected>15%</option><option value="20">20%</option></select></label>` : ''}
           <div class="list">${items.length ? items.map(i => {
             const out = i.stock != null && i.stock <= 0;
-            return `<div class="li"><div class="main"><b>${esc(i.name)}</b><small>${i.stock == null ? 'Always in stock' : out ? 'Sold out' : i.stock + ' left'}</small></div>
+            return `<div class="li"><div class="main"><b>${esc(i.name)}</b><small>${i.stock == null ? (isR ? 'On the menu' : 'Always in stock') : out ? 'Sold out' : i.stock + ' left'}</small></div>
               <span class="amt">${money(i.price)}</span>
-              ${out ? '' : `<input id="q-${i.id}" type="number" min="1" value="1" style="width:70px;min-height:40px;padding:6px 8px" aria-label="Quantity"><button class="btn sm" data-act="buy" data-id="${i.id}">Buy</button>`}</div>`;
-          }).join('') : '<div class="empty">Nothing for sale yet.</div>'}</div></section>`;
-      }).join('') : '<div class="empty">No other shops are open yet. Open your own under My shop.</div>'}
-    </div><div class="stack"><section class="panel"><h3>Your orders</h3><div class="list">${mine.length ? mine.map(o => `<div class="li"><div class="main"><b>${o.qty} × ${esc(o.itemName)}</b><small>${esc(S.shops[o.shopId]?.name || 'Closed shop')} · ${when(o.at)}</small></div><span class="pill ${st[o.status][1]}">${st[o.status][0]}</span><span class="amt">${money(o.total)}</span></div>`).join('') : '<div class="empty">You haven’t ordered anything.</div>'}</div></section></div></div>`;
+              ${out ? '' : `<input id="q-${i.id}" type="number" min="1" value="1" style="width:70px;min-height:40px;padding:6px 8px" aria-label="Quantity"><button class="btn sm" data-act="buy" data-id="${i.id}">${T.buy}</button>`}</div>`;
+          }).join('') : `<div class="empty">Nothing on the ${T.list.toLowerCase()} yet.</div>`}</div></section>`;
+      }).join('') : '<div class="empty">No other businesses are open yet. Open your own under My businesses.</div>'}
+    </div><div class="stack"><section class="panel"><h3>Your orders</h3><div class="list">${mine.length ? mine.map(o => {
+      const T = BIZ[o.bizType === 'restaurant' ? 'restaurant' : 'shop'];
+      const st = o.status === 'new' ? ['Ordered', 'warn'] : o.status === 'done' ? [T.done, 'good'] : ['Refunded', 'mute'];
+      return `<div class="li"><div class="main"><b>${o.qty} × ${esc(o.itemName)}</b><small>${esc(S.shops[o.shopId]?.name || 'Closed')} · ${o.day ? 'Day ' + o.day : when(o.at)}${o.tip ? ' · tip ' + money(o.tip) : ''}</small></div><span class="pill ${st[1]}">${st[0]}</span><span class="amt">${money(o.total)}</span></div>`;
+    }).join('') : '<div class="empty">You haven’t ordered anything.</div>'}</div></section></div></div>`;
   }
   if (S.tab === 'myshop') {
-    const shop = Object.values(S.shops).find(s => s.ownerId === pid);
-    if (!shop) return `<section class="panel" style="max-width:560px"><h2>Open a shop</h2><p class="muted">Sell things to the rest of town. Buyers pay you straight into checking.</p>
-      <form data-form="openShop"><label>Shop name<input id="os-name" required maxlength="40" placeholder="Lemonade Stand"></label>
-      <label>What do you sell?<input id="os-desc" maxlength="100" placeholder="Fresh lemonade and cookies"></label><div><button class="btn">Open for business</button></div></form></section>`;
-    const items = Object.values(S.items).filter(i => i.shopId === shop.id);
-    const orders = S.orders.filter(o => o.shopId === shop.id).sort((a, c) => c.at - a.at);
-    const sales = orders.filter(o => o.status !== 'refunded').reduce((s, o) => s + o.total, 0);
-    return `<div class="panel-head"><div><p class="eyebrow">Your shop</p><h2>${esc(shop.name)}</h2></div><button class="btn danger sm" data-act="closeShop" data-id="${shop.id}">Close shop</button></div>
-    <div class="stats"><div class="stat"><b>${money(sales)}</b><span>Total sales</span></div><div class="stat"><b>${orders.filter(o => o.status === 'new').length}</b><span>Orders to deliver</span></div><div class="stat"><b>${items.length}</b><span>Items for sale</span></div></div>
-    <div class="cols even"><div class="stack">
-      <section class="panel"><h3>Orders</h3><div class="list">${orders.length ? orders.map(o => `<div class="li"><div class="main"><b>${o.qty} × ${esc(o.itemName)}</b><small>${esc(nameOf(o.buyerId))} · ${when(o.at)} · ${money(o.total)}</small></div>
-        ${o.status === 'new' ? `<button class="btn sm" data-act="deliver" data-id="${o.id}">Delivered</button><button class="btn ghost sm" data-act="refund" data-id="${o.id}">Refund</button>` : `<span class="pill ${o.status === 'done' ? 'good' : 'mute'}">${o.status === 'done' ? 'Delivered' : 'Refunded'}</span>`}</div>`).join('') : '<div class="empty">No orders yet.</div>'}</div></section>
-    </div><div class="stack">
-      <section class="panel"><h3>Add an item</h3><form data-form="addItem"><div class="fields">
-        <label>Item<input id="ai-name" required maxlength="40" placeholder="Cookie"></label>
-        <label>Price<input id="ai-price" inputmode="decimal" required placeholder="1.50"></label>
-        <label>Stock<input id="ai-stock" type="number" min="0" placeholder="Blank = unlimited"></label></div>
-        <div><button class="btn">Add to shop</button></div></form></section>
-      <section class="panel"><h3>Price list</h3><div class="list">${items.length ? items.map(i => `<form class="li" data-form="editItem" data-id="${i.id}" style="display:flex">
-        <div class="main"><b>${esc(i.name)}</b></div>
-        <input id="ei-p-${i.id}" inputmode="decimal" value="${(i.price / 100).toFixed(2)}" style="width:86px;min-height:40px;padding:6px 8px" aria-label="Price">
-        <input id="ei-s-${i.id}" type="number" min="0" value="${i.stock ?? ''}" placeholder="∞" style="width:70px;min-height:40px;padding:6px 8px" aria-label="Stock">
-        <button class="btn ghost sm">Save</button><button type="button" class="btn danger sm" data-act="removeItem" data-id="${i.id}">✕</button></form>`).join('') : '<div class="empty">Add your first item.</div>'}</div></section>
-    </div></div>`;
+    const owned = t => Object.values(S.shops).find(s => s.ownerId === pid && bizType(s) === t);
+    const blocks = ['shop', 'restaurant'].map(t => owned(t) ? manageBiz(owned(t)) : '');
+    const openForms = ['shop', 'restaurant'].filter(t => !owned(t)).map(t => { const T = BIZ[t]; return `<section class="panel"><h3>Open a ${T.noun}</h3>
+      <p class="muted">${t === 'shop' ? 'Sell things to the rest of town.' : 'Cook and serve meals. Customers can leave tips.'} Customers pay straight into your checking.</p>
+      <form data-form="openBiz" data-id="${t}"><label>${T.Noun} name<input id="ob-n-${t}" required maxlength="40" placeholder="${T.ph}"></label>
+      <label>What do you ${t === 'shop' ? 'sell' : 'serve'}?<input id="ob-d-${t}" maxlength="100" placeholder="${T.php}"></label><div><button class="btn">Open for business</button></div></form></section>`; });
+    return blocks.join('') + (openForms.length ? `<div class="cols even">${openForms.map(f => `<div class="stack">${f}</div>`).join('')}</div>` : '');
   }
   if (S.tab === 'loans') {
     const cr = credit(pid), loans = loansOf(pid);
@@ -445,17 +510,19 @@ function playerView() {
       <section class="panel"><div class="gauge-wrap">${gauge(cr.score, cr.band[1])}<div style="display:grid;gap:4px"><p class="eyebrow">Your credit score</p><div class="score num">${cr.score}</div><span class="pill ${cr.band[1]}">${cr.band[0]}</span></div></div>
         <div class="stats">
           <div class="stat"><b>${cr.paid}</b><span>Loans paid off (+40 each)</span></div>
-          <div class="stat"><b>${cr.pays}</b><span>Payments made (+6 each)</span></div>
-          <div class="stat"><b>${cr.missed}</b><span>Missed payments (−60 each)</span></div>
+          <div class="stat"><b>${cr.pays}</b><span>Loan payments (+6 each)</span></div>
+          <div class="stat"><b>${cr.onTime}</b><span>Bills paid on time (+5 each)</span></div>
+          <div class="stat"><b>${cr.late}</b><span>Late bills (−30 each)</span></div>
+          <div class="stat"><b>${cr.missed}</b><span>Missed loan payments (−60 each)</span></div>
           <div class="stat"><b>${money(cr.owed)}</b><span>Owed of ${money(cr.limit)} limit</span></div></div>
-        <p class="muted" style="font-size:.88rem">Scores run 300 to 850. Paying loans back raises it. Missing payments or borrowing close to your limit lowers it. A better score gives you a bigger credit limit.</p></section>
+        <p class="muted" style="font-size:.88rem">Scores run 300 to 850. Paying bills and loans on time raises it. Late bills, missed payments, or borrowing close to your limit lower it. A better score gives you a bigger credit limit.</p></section>
       <section class="panel"><h3>Your loans</h3>${loans.length ? loans.map(l => `<div class="shop">
         <div class="panel-head"><b>${esc(l.purpose || 'Loan')} · ${money(l.amount)}</b><span class="pill ${st[l.status][1]}">${st[l.status][0]}</span></div>
-        ${l.status === 'active' ? `<p>Still owe <b class="num">${money(l.balance)}</b> · ${l.rate}% interest each interest day · interest so far <span class="num">${money(l.interest || 0)}</span></p>
-          <form class="inline" data-form="repay" data-id="${l.id}"><label>Pay back<input id="rp-${l.id}" inputmode="decimal" placeholder="${(Math.min(l.balance, bal(balances(), pid, 'c')) / 100).toFixed(2)}" required></label><button class="btn gold">Make payment</button></form>`
+        ${l.status === 'active' ? `<p>Still owe <b class="num">${money(l.balance)}</b> · ${l.rate}% interest every ${every('interestEvery')} days · interest so far <span class="num">${money(l.interest || 0)}</span></p>
+          <form class="inline" data-form="repay" data-id="${l.id}"><label>Pay back<input id="rp-${l.id}" inputmode="decimal" placeholder="${(Math.min(l.balance, Math.max(0, bal(b, pid, 'c'))) / 100).toFixed(2)}" required></label><button class="btn gold">Make payment</button></form>`
         : `<small class="muted">${when(l.at)}${l.status === 'paid' ? ` · paid ${money(l.interest || 0)} in interest` : ''}</small>`}</div>`).join('') : '<div class="empty">No loans yet.</div>'}</section>
     </div><div class="stack">
-      <section class="panel"><h3>Ask for a loan</h3><p>You can borrow up to <b class="num">${money(cr.avail)}</b> right now. Current loan rate: <b>${rate('loanRate')}%</b> each interest day.</p>
+      <section class="panel"><h3>Ask for a loan</h3><p>You can borrow up to <b class="num">${money(cr.avail)}</b> right now. Current loan rate: <b>${cfg('loanRate')}%</b> every ${every('interestEvery')} days.</p>
         <form data-form="request"><div class="fields"><label>Amount<input id="lr-amt" inputmode="decimal" required placeholder="0.00"></label>
           <label>What’s it for?<input id="lr-why" maxlength="50" required placeholder="Supplies for my shop"></label></div>
           <div><button class="btn" ${cr.avail <= 0 ? 'disabled' : ''}>Send to the banker</button></div></form></section>
@@ -464,17 +531,45 @@ function playerView() {
   return '';
 }
 
+function manageBiz(shop) {
+  const t = bizType(shop), T = BIZ[t];
+  const items = Object.values(S.items).filter(i => i.shopId === shop.id);
+  const orders = S.orders.filter(o => o.shopId === shop.id).sort((a, c) => c.at - a.at);
+  const kept = orders.filter(o => o.status !== 'refunded');
+  const sales = kept.reduce((s, o) => s + o.total, 0), tips = kept.reduce((s, o) => s + (o.tip || 0), 0);
+  const sid = shop.id;
+  return `<div class="panel-head"><div><p class="eyebrow">Your ${T.noun}</p><h2>${esc(shop.name)}</h2></div><button class="btn danger sm" data-act="closeShop" data-id="${sid}">Close ${T.noun}</button></div>
+    <div class="stats"><div class="stat"><b>${money(sales)}</b><span>Total sales</span></div>${t === 'restaurant' ? `<div class="stat"><b>${money(tips)}</b><span>Tips earned</span></div>` : ''}<div class="stat"><b>${orders.filter(o => o.status === 'new').length}</b><span>Orders to ${t === 'shop' ? 'deliver' : 'serve'}</span></div><div class="stat"><b>${items.length}</b><span>${t === 'shop' ? 'Items for sale' : 'Dishes on the menu'}</span></div></div>
+    <div class="cols even"><div class="stack">
+      <section class="panel"><h3>Orders</h3><div class="list">${orders.length ? orders.map(o => `<div class="li"><div class="main"><b>${o.qty} × ${esc(o.itemName)}</b><small>${esc(nameOf(o.buyerId))} · ${o.day ? 'Day ' + o.day : when(o.at)} · ${money(o.total)}${o.tip ? ' incl. ' + money(o.tip) + ' tip' : ''}</small></div>
+        ${o.status === 'new' ? `<button class="btn sm" data-act="deliver" data-id="${o.id}">${T.done}</button><button class="btn ghost sm" data-act="refund" data-id="${o.id}">Refund</button>` : `<span class="pill ${o.status === 'done' ? 'good' : 'mute'}">${o.status === 'done' ? T.done : 'Refunded'}</span>`}</div>`).join('') : '<div class="empty">No orders yet.</div>'}</div></section>
+    </div><div class="stack">
+      <section class="panel"><h3>Add to the ${T.list.toLowerCase()}</h3><form data-form="addItem" data-id="${sid}"><div class="fields">
+        <label>${T.item}<input id="ai-n-${sid}" required maxlength="40" placeholder="${T.iph}"></label>
+        <label>Price<input id="ai-p-${sid}" inputmode="decimal" required placeholder="${t === 'shop' ? '1.50' : '6.00'}"></label>
+        <label>${t === 'shop' ? 'Stock' : 'Servings'}<input id="ai-s-${sid}" type="number" min="0" placeholder="Blank = unlimited"></label></div>
+        <div><button class="btn">Add</button></div></form></section>
+      <section class="panel"><h3>${T.list}</h3><div class="list">${items.length ? items.map(i => `<form class="li" data-form="editItem" data-id="${i.id}" style="display:flex">
+        <div class="main"><b>${esc(i.name)}</b></div>
+        <input id="ei-p-${i.id}" inputmode="decimal" value="${(i.price / 100).toFixed(2)}" style="width:86px;min-height:40px;padding:6px 8px" aria-label="Price">
+        <input id="ei-s-${i.id}" type="number" min="0" value="${i.stock ?? ''}" placeholder="∞" style="width:70px;min-height:40px;padding:6px 8px" aria-label="Stock">
+        <button class="btn ghost sm">Save</button><button type="button" class="btn danger sm" data-act="removeItem" data-id="${i.id}" aria-label="Remove">✕</button></form>`).join('') : `<div class="empty">Add your first ${T.item.toLowerCase()}.</div>`}</div></section>
+    </div></div>`;
+}
+
 // ---------- banker views ----------
 function bankView() {
   const b = balances(), ps = playerList();
   if (S.tab === 'town') {
     const chk = ps.reduce((s, p) => s + bal(b, p.id, 'c'), 0), sav = ps.reduce((s, p) => s + bal(b, p.id, 's'), 0);
     const owed = Object.values(S.loans).filter(l => l.status === 'active').reduce((s, l) => s + l.balance, 0);
-    return `<div class="stats"><div class="stat"><b>${money(chk + sav)}</b><span>Money in town</span></div><div class="stat"><b>${money(sav)}</b><span>In savings</span></div>
-      <div class="stat"><b>${money(owed)}</b><span>Owed on loans</span></div><div class="stat"><b>${S.tx.length}</b><span>Transactions</span></div></div>
+    const unpaid = S.bills.filter(x => x.status === 'due' || x.status === 'late');
+    return `<div class="alert"><span><b>Day ${today()}</b> · next payday ${dayIn(nextOn('payEvery'))} · bills ${dayIn(nextOn('billEvery'))} · interest ${dayIn(nextOn('interestEvery'))}</span><button class="btn gold sm" data-act="advance">Advance to Day ${today() + 1}</button></div>
+    <div class="stats"><div class="stat"><b>${money(chk + sav)}</b><span>Money in town</span></div><div class="stat"><b>${money(sav)}</b><span>In savings</span></div>
+      <div class="stat"><b>${money(owed)}</b><span>Owed on loans</span></div><div class="stat"><b>${money(unpaid.reduce((s, x) => s + x.total, 0))}</b><span>Unpaid bills (${unpaid.length})</span></div></div>
     <div class="cols"><div class="stack">
-      <section class="panel"><h3>Residents</h3>${ps.length ? `<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Job</th><th class="r">Checking</th><th class="r">Savings</th><th class="r">Owes</th><th class="r">Credit</th></tr></thead><tbody>
-        ${ps.map(p => { const c = credit(p.id); return `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.job || '—')}</td><td class="r num">${money(bal(b, p.id, 'c'))}</td><td class="r num">${money(bal(b, p.id, 's'))}</td><td class="r num">${money(c.owed)}</td><td class="r"><span class="pill ${c.band[1]}">${c.score}</span></td></tr>`; }).join('')}
+      <section class="panel"><h3>Residents</h3>${ps.length ? `<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Job</th><th class="r">Checking</th><th class="r">Savings</th><th class="r">Owes</th><th class="r">Bills</th><th class="r">Credit</th></tr></thead><tbody>
+        ${ps.map(p => { const c = credit(p.id), ob = openBills(p.id); return `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.job || '—')}</td><td class="r num ${bal(b, p.id, 'c') < 0 ? 'neg' : ''}">${money(bal(b, p.id, 'c'))}</td><td class="r num">${money(bal(b, p.id, 's'))}</td><td class="r num">${money(c.owed)}</td><td class="r">${ob.length ? `<span class="pill ${ob.some(x => x.status === 'late') ? 'bad' : 'warn'}">${ob.length} open</span>` : '<span class="pill good">Paid</span>'}</td><td class="r"><span class="pill ${c.band[1]}">${c.score}</span></td></tr>`; }).join('')}
         </tbody></table></div>` : `<div class="empty">Add residents under the Residents tab.</div>`}</section>
       <section class="panel"><h3>Town ledger</h3><div class="list">${txRows(S.tx, null, 60)}</div></section>
     </div><div class="stack">
@@ -488,37 +583,43 @@ function bankView() {
           <div><button class="btn">Record it</button></div></form></section>
     </div></div>`;
   }
-  if (S.tab === 'payday') {
-    const tr = rate('taxRate'), paid = ps.filter(p => (p.wage || 0) > 0);
-    const gross = paid.reduce((s, p) => s + p.wage, 0), tax = paid.reduce((s, p) => s + Math.round(p.wage * tr / 100), 0);
-    return `<div class="cols"><div class="stack"><section class="panel"><div class="panel-head"><h2>Payday</h2>
-        <span class="muted" style="font-size:.88rem">${S.settings.lastPayday ? 'Last payday ' + when(S.settings.lastPayday) : 'No payday yet'} · ${S.settings.paydays || 0} so far</span></div>
-      ${paid.length ? `<div class="tbl-wrap"><table><thead><tr><th>Resident</th><th>Job</th><th class="r">Gross</th><th class="r">Tax ${tr}%</th><th class="r">Take-home</th></tr></thead><tbody>
-        ${paid.map(p => { const t = Math.round(p.wage * tr / 100); return `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.job || '—')}</td><td class="r num">${money(p.wage)}</td><td class="r num neg">${money(-t)}</td><td class="r num"><b>${money(p.wage - t)}</b></td></tr>`; }).join('')}
-        <tr><td colspan="2"><b>Total</b></td><td class="r num">${money(gross)}</td><td class="r num">${money(-tax)}</td><td class="r num"><b>${money(gross - tax)}</b></td></tr></tbody></table></div>
-        <div><button class="btn gold" data-act="payday">Run payday</button></div>` : `<div class="empty">Nobody has a wage yet. Set jobs and wages under Residents.</div>`}
-    </section></div><div class="stack"><section class="panel"><h3>How payday works</h3>
-      <p class="muted">Each resident’s wage is the gross pay. Town tax comes off the top and goes back to the bank. The rest is deposited to checking with a pay stub in their activity, so they can see gross versus take-home.</p>
-      <p class="muted">Change the tax rate in Settings.</p></section></div></div>`;
+  if (S.tab === 'calendar') {
+    const d = today() + 1, tr = cfg('taxRate'), paid = ps.filter(p => (p.wage || 0) > 0);
+    const willPay = d % every('payEvery') === 0, willInt = d % every('interestEvery') === 0, willBill = d % every('billEvery') === 0;
+    const willLate = S.bills.filter(x => x.status === 'due' && x.dueDay < d);
+    const happens = [willPay && `Payday: ${paid.length} paycheck${paid.length === 1 ? '' : 's'}`, willBill && `Utility bills to ${ps.length} resident${ps.length === 1 ? '' : 's'} (${money(billTotal())} each)`, willInt && 'Interest day for loans and savings', willLate.length && `${willLate.length} unpaid bill${willLate.length > 1 ? 's' : ''} turn late (+${money(cfg('lateFee'))} fee each)`].filter(Boolean);
+    const unpaid = S.bills.filter(x => x.status === 'due' || x.status === 'late').sort((a, c) => a.dueDay - c.dueDay);
+    return `<div class="cols"><div class="stack">
+      <section class="panel"><div class="panel-head"><div><p class="eyebrow">Today in ${esc(S.settings.name)}</p><div class="bigday">Day ${today()}</div></div>
+        <button class="btn gold" data-act="advance">Advance to Day ${d}</button></div>
+        <div><p class="eyebrow" style="margin-bottom:6px">When you advance to Day ${d}</p>
+        ${happens.length ? `<div class="list">${happens.map(h => `<div class="li"><div class="main"><b>${esc(h)}</b></div></div>`).join('')}</div>` : '<p class="muted">Nothing scheduled. Just a regular day.</p>'}</div></section>
+      <section class="panel"><h3>Schedule</h3><div class="cal">
+        <div class="stat"><b>${dayIn(nextOn('payEvery'))}</b><span>Payday · every ${every('payEvery')} days</span></div>
+        <div class="stat"><b>${dayIn(nextOn('billEvery'))}</b><span>Bills · every ${every('billEvery')} days, due in ${Math.round(cfg('billGrace'))}</span></div>
+        <div class="stat"><b>${dayIn(nextOn('interestEvery'))}</b><span>Interest · every ${every('interestEvery')} days</span></div></div>
+        <p class="muted" style="font-size:.85rem">Change how often these happen in Settings.</p></section>
+      <section class="panel"><h3>Pay stubs for next payday</h3>${paid.length ? `<div class="tbl-wrap"><table><thead><tr><th>Resident</th><th>Job</th><th class="r">Gross</th><th class="r">Tax ${tr}%</th><th class="r">Take-home</th></tr></thead><tbody>
+        ${paid.map(p => { const t = Math.round(p.wage * tr / 100); return `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.job || '—')}</td><td class="r num">${money(p.wage)}</td><td class="r num neg">${money(-t)}</td><td class="r num"><b>${money(p.wage - t)}</b></td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty">Nobody has a wage yet. Set jobs and wages under Residents.</div>'}</section>
+    </div><div class="stack">
+      <section class="panel"><h3>Unpaid bills</h3><div class="list">${unpaid.length ? unpaid.map(x => `<div class="li"><div class="main"><b>${esc(nameOf(x.playerId))}</b><small>Issued Day ${x.issuedDay} · due Day ${x.dueDay}</small></div><span class="pill ${x.status === 'late' ? 'bad' : 'warn'}">${x.status === 'late' ? 'Late' : 'Due'}</span><span class="amt">${money(x.total)}</span></div>`).join('') : '<div class="empty">Everyone is paid up.</div>'}</div></section>
+      <section class="panel"><h3>Run something now</h3><p class="muted" style="font-size:.88rem">For a bonus payday or a surprise bill without changing the day.</p>
+        <div class="row"><button class="btn ghost sm" data-act="runNow" data-id="pay">Payday now</button><button class="btn ghost sm" data-act="runNow" data-id="bills">Send bills now</button><button class="btn ghost sm" data-act="runNow" data-id="interest">Interest now</button></div></section>
+    </div></div>`;
   }
   if (S.tab === 'loans') {
     const all = Object.values(S.loans).sort((a, c) => c.at - a.at);
     const req = all.filter(l => l.status === 'requested'), act = all.filter(l => l.status === 'active');
-    const loanInt = act.reduce((s, l) => s + Math.round(l.balance * l.rate / 100), 0);
-    const savInt = ps.reduce((s, p) => s + Math.max(0, Math.round(bal(b, p.id, 's') * rate('savingsRate') / 100)), 0);
     return `<div class="cols"><div class="stack">
       <section class="panel"><h3>Loan requests</h3>${req.length ? req.map(l => { const c = credit(l.playerId); return `<div class="shop">
         <div class="panel-head"><b>${esc(nameOf(l.playerId))} wants ${money(l.amount)}</b><span class="pill ${c.band[1]}">Credit ${c.score}</span></div>
         <p class="muted">For: ${esc(l.purpose)} · can borrow up to ${money(c.avail)} · ${when(l.at)}</p>
-        <form class="inline" data-form="approve" data-id="${l.id}"><label>Interest % per interest day<input id="la-${l.id}" inputmode="decimal" value="${l.rate}"></label>
+        <form class="inline" data-form="approve" data-id="${l.id}"><label>Interest % every ${every('interestEvery')} days<input id="la-${l.id}" inputmode="decimal" value="${l.rate}"></label>
           <button class="btn">Approve</button><button type="button" class="btn ghost" data-act="decline" data-id="${l.id}">Decline</button></form></div>`; }).join('') : '<div class="empty">No requests waiting.</div>'}</section>
+    </div><div class="stack">
       <section class="panel"><h3>Active loans</h3>${act.length ? `<div class="tbl-wrap"><table><thead><tr><th>Resident</th><th>For</th><th class="r">Balance</th><th class="r">Rate</th><th class="r">Missed</th><th></th></tr></thead><tbody>
-        ${act.map(l => `<tr><td><b>${esc(nameOf(l.playerId))}</b></td><td>${esc(l.purpose)}</td><td class="r num">${money(l.balance)}</td><td class="r">${l.rate}%</td><td class="r">${l.missed || 0}</td><td class="r"><button class="btn danger sm" data-act="missed" data-id="${l.id}">Missed a payment</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No active loans.</div>'}</section>
-    </div><div class="stack"><section class="panel"><h3>Interest day</h3>
-      <p class="muted">Adds interest to every active loan and pays interest into every savings account. Run it once a week, or whenever your town decides.</p>
-      <div class="stats"><div class="stat"><b>${money(loanInt)}</b><span>Added to loans (${act.length})</span></div><div class="stat"><b>${money(savInt)}</b><span>Paid to savings at ${rate('savingsRate')}%</span></div></div>
-      <p class="muted" style="font-size:.85rem">${S.settings.lastInterest ? 'Last interest day ' + when(S.settings.lastInterest) : 'Interest has never been run.'}</p>
-      <div><button class="btn gold" data-act="interest" ${loanInt + savInt <= 0 ? 'disabled' : ''}>Run interest day</button></div></section></div></div>`;
+        ${act.map(l => `<tr><td><b>${esc(nameOf(l.playerId))}</b></td><td>${esc(l.purpose)}</td><td class="r num">${money(l.balance)}</td><td class="r">${l.rate}%</td><td class="r">${l.missed || 0}</td><td class="r"><button class="btn danger sm" data-act="missed" data-id="${l.id}">Missed payment</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No active loans.</div>'}
+        <p class="muted" style="font-size:.85rem">Interest is added automatically every ${every('interestEvery')} days when you advance the day.</p></section></div></div>`;
   }
   if (S.tab === 'people') {
     return `<div class="cols"><div class="stack"><section class="panel"><h3>Residents</h3>
@@ -538,20 +639,31 @@ function bankView() {
   }
   if (S.tab === 'shops') {
     const shops = Object.values(S.shops);
-    return `<section class="panel"><h3>Shops on Main Street</h3>${shops.length ? `<div class="tbl-wrap"><table><thead><tr><th>Shop</th><th>Owner</th><th class="r">Items</th><th class="r">Sales</th><th class="r">Open orders</th><th></th></tr></thead><tbody>
-      ${shops.map(s => { const os = S.orders.filter(o => o.shopId === s.id); return `<tr><td><b>${esc(s.name)}</b></td><td>${esc(nameOf(s.ownerId))}</td><td class="r">${Object.values(S.items).filter(i => i.shopId === s.id).length}</td><td class="r num">${money(os.filter(o => o.status !== 'refunded').reduce((a, o) => a + o.total, 0))}</td><td class="r">${os.filter(o => o.status === 'new').length}</td><td class="r"><button class="btn danger sm" data-act="closeShop" data-id="${s.id}">Close</button></td></tr>`; }).join('')}
-      </tbody></table></div>` : '<div class="empty">No shops yet. Kids open shops from their own My shop tab.</div>'}</section>`;
+    return `<section class="panel"><h3>Businesses on Main Street</h3>${shops.length ? `<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Type</th><th>Owner</th><th class="r">Items</th><th class="r">Sales</th><th class="r">Open orders</th><th></th></tr></thead><tbody>
+      ${shops.map(s => { const os = S.orders.filter(o => o.shopId === s.id); return `<tr><td><b>${esc(s.name)}</b></td><td>${BIZ[bizType(s)].Noun}</td><td>${esc(nameOf(s.ownerId))}</td><td class="r">${Object.values(S.items).filter(i => i.shopId === s.id).length}</td><td class="r num">${money(os.filter(o => o.status !== 'refunded').reduce((a, o) => a + o.total, 0))}</td><td class="r">${os.filter(o => o.status === 'new').length}</td><td class="r"><button class="btn danger sm" data-act="closeShop" data-id="${s.id}">Close</button></td></tr>`; }).join('')}
+      </tbody></table></div>` : '<div class="empty">No businesses yet. Kids open shops and restaurants from their My businesses tab.</div>'}</section>`;
   }
   if (S.tab === 'settings') {
-    const s = S.settings;
-    return `<section class="panel" style="max-width:640px"><h3>Bank rules</h3><form data-form="settings"><div class="fields">
-      <label>Town name<input id="st-name" value="${esc(s.name)}" required maxlength="40"></label>
-      <label>Money symbol<input id="st-sym" value="${esc(s.symbol || '$')}" maxlength="3"></label>
-      <label>Town tax on pay (%)<input id="st-tax" inputmode="decimal" value="${rate('taxRate')}"></label>
-      <label>Savings interest (%)<input id="st-sav" inputmode="decimal" value="${rate('savingsRate')}"></label>
-      <label>Default loan interest (%)<input id="st-loan" inputmode="decimal" value="${rate('loanRate')}"></label>
-      <label>Banker PIN<input id="st-pin" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" value="${esc(s.bankerPin || '')}" required></label></div>
-      <div><button class="btn">Save rules</button></div></form></section>`;
+    const s = S.settings, ut = utilities(), rows = [0, 1, 2, 3].map(i => ut[i] || {name: '', amount: 0});
+    return `<form data-form="settings" style="max-width:760px;display:grid;gap:20px">
+      <section class="panel"><h3>Town</h3><div class="fields">
+        <label>Town name<input id="st-name" value="${esc(s.name)}" required maxlength="40"></label>
+        <label>Money symbol<input id="st-sym" value="${esc(s.symbol || '$')}" maxlength="3"></label>
+        <label>Banker PIN<input id="st-pin" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" value="${esc(s.bankerPin || '')}" required></label>
+        <label>Current day<input id="st-day" type="number" min="1" value="${today()}"></label></div></section>
+      <section class="panel"><h3>Schedule</h3><div class="fields">
+        <label>Payday every (days)<input id="st-payev" type="number" min="1" value="${every('payEvery')}"></label>
+        <label>Bills every (days)<input id="st-billev" type="number" min="1" value="${every('billEvery')}"></label>
+        <label>Days to pay a bill<input id="st-grace" type="number" min="0" value="${Math.round(cfg('billGrace'))}"></label>
+        <label>Interest every (days)<input id="st-intev" type="number" min="1" value="${every('interestEvery')}"></label></div></section>
+      <section class="panel"><h3>Rates</h3><div class="fields">
+        <label>Town tax on pay (%)<input id="st-tax" inputmode="decimal" value="${cfg('taxRate')}"></label>
+        <label>Savings interest (%)<input id="st-sav" inputmode="decimal" value="${cfg('savingsRate')}"></label>
+        <label>Default loan interest (%)<input id="st-loan" inputmode="decimal" value="${cfg('loanRate')}"></label>
+        <label>Late fee per bill<input id="st-late" inputmode="decimal" value="${(cfg('lateFee') / 100).toFixed(2)}"></label></div></section>
+      <section class="panel"><h3>Utility bill</h3><p class="muted" style="font-size:.88rem">Every resident gets this bill. Leave a name blank to drop that line.</p>
+        ${rows.map((u, i) => `<div class="fields"><label>Utility<input id="ut-n-${i}" value="${esc(u.name)}" maxlength="24"></label><label>Amount<input id="ut-a-${i}" inputmode="decimal" value="${u.amount ? (u.amount / 100).toFixed(2) : ''}"></label></div>`).join('')}</section>
+      <div><button class="btn">Save settings</button></div></form>`;
   }
   return '';
 }
@@ -595,19 +707,51 @@ const acts = {
   tab: id => { S.tab = id; window.scrollTo(0, 0); render(); },
   modalNo: () => { S.modal = null; render(); },
   modalYes: () => { const f = S.modal?.fn; S.modal = null; render(); if (f) run(f); },
+  advance: () => {
+    const d = today() + 1;
+    confirmIt(`Advance to Day ${d}?`, 'Everything scheduled for that day runs now: paydays, bills, interest and late fees. This can’t be undone.', `Start Day ${d}`, async () => {
+      const patch = {}, done = [];
+      const late = await markLate(d); if (late) done.push(late);
+      if (d % every('payEvery') === 0) { const r = await doPayday(patch); if (r) done.push(r); }
+      if (d % every('billEvery') === 0) { const r = await doBills(d); if (r) done.push(r); }
+      if (d % every('interestEvery') === 0) { const r = await doInterest(patch); if (r) done.push(r); }
+      patch.day = d;
+      await db.doc('town/settings').update(patch);
+      toast(`Good morning, Day ${d}!` + (done.length ? ' ' + done.join(', ') + '.' : ''));
+    });
+  },
+  runNow: what => {
+    const label = {pay: 'Run a payday now?', bills: 'Send utility bills now?', interest: 'Run interest now?'}[what];
+    confirmIt(label, 'This happens right away and doesn’t change the day or the schedule.', 'Do it', async () => {
+      const patch = {};
+      if (what === 'pay') { if (!(await doPayday(patch))) fail('Nobody has a wage yet.'); }
+      if (what === 'bills') { if (!(await doBills(today()))) fail('Add residents and utility amounts first.'); }
+      if (what === 'interest') await doInterest(patch);
+      if (Object.keys(patch).length) await db.doc('town/settings').update(patch);
+      toast('Done');
+    });
+  },
+  payBill: id => run(async () => {
+    const x = S.bills.find(y => y.id === id); if (!x || (x.status !== 'due' && x.status !== 'late')) fail('That bill is already paid.');
+    if (bal(balances(), S.me, 'c') < x.total) fail(`Not enough in checking. You need ${money(x.total)}.`);
+    await addTx(S.me + '.c', 'bank', x.total, 'bill', `Utility bill from Day ${x.issuedDay}` + (x.status === 'late' ? ' (late)' : ''));
+    await db.doc('bills/' + id).update({status: x.status === 'late' ? 'paidLate' : 'paid', paidDay: today(), paidAt: Date.now()});
+    toast(x.status === 'late' ? 'Bill paid. Try to pay on time next time.' : 'Bill paid on time. Your credit score went up.');
+  }),
   buy: id => run(async () => {
     const it = S.items[id]; if (!it) fail('That item is gone.');
-    const shop = S.shops[it.shopId]; if (!shop) fail('That shop closed.');
-    const qty = parseInt(val('q-' + id), 10); if (!(qty >= 1)) fail('Choose how many to buy.');
+    const shop = S.shops[it.shopId]; if (!shop) fail('That business closed.');
+    const isR = bizType(shop) === 'restaurant';
+    const qty = parseInt(val('q-' + id), 10); if (!(qty >= 1)) fail('Choose how many.');
     if (it.stock != null && it.stock < qty) fail(`Only ${it.stock} left.`);
-    const total = it.price * qty;
+    const sub = it.price * qty, tipPct = isR ? (parseFloat(val('tip-' + shop.id)) || 0) : 0, tip = Math.round(sub * tipPct / 100), total = sub + tip;
     if (bal(balances(), S.me, 'c') < total) fail(`Not enough in checking. You need ${money(total)}.`);
-    await addTx(S.me + '.c', shop.ownerId + '.c', total, 'purchase', `${qty} × ${it.name} at ${shop.name}`);
+    await addTx(S.me + '.c', shop.ownerId + '.c', total, isR ? 'meal' : 'purchase', `${qty} × ${it.name} at ${shop.name}` + (tip ? ` + ${money(tip)} tip` : ''));
     if (it.stock != null) await db.doc('items/' + id).update({stock: it.stock - qty});
-    await db.collection('orders').add({shopId: shop.id, itemId: id, itemName: it.name, qty, price: it.price, total, buyerId: S.me, sellerId: shop.ownerId, status: 'new', at: Date.now()});
+    await db.collection('orders').add({shopId: shop.id, bizType: bizType(shop), itemId: id, itemName: it.name, qty, price: it.price, tip, total, buyerId: S.me, sellerId: shop.ownerId, status: 'new', day: today(), at: Date.now()});
     clear('q-' + id); toast(`Ordered ${qty} × ${it.name}`);
   }),
-  deliver: id => run(async () => { await db.doc('orders/' + id).update({status: 'done'}); toast('Marked delivered'); }),
+  deliver: id => run(async () => { const o = S.orders.find(x => x.id === id); await db.doc('orders/' + id).update({status: 'done'}); toast(o?.bizType === 'restaurant' ? 'Marked served' : 'Marked delivered'); }),
   refund: id => {
     const o = S.orders.find(x => x.id === id); if (!o) return;
     confirmIt('Refund this order?', `${money(o.total)} goes back to ${nameOf(o.buyerId)} from your checking.`, 'Refund', async () => {
@@ -618,33 +762,15 @@ const acts = {
       toast('Refunded');
     });
   },
-  removeItem: id => confirmIt('Remove this item?', `${S.items[id]?.name || 'It'} will come off the price list.`, 'Remove', async () => { await db.doc('items/' + id).delete(); }, true),
-  closeShop: id => confirmIt('Close this shop?', 'Its items come off Main Street. Past sales stay in the records.', 'Close shop', async () => {
+  removeItem: id => confirmIt('Remove this?', `${S.items[id]?.name || 'It'} will come off the list.`, 'Remove', async () => { await db.doc('items/' + id).delete(); }, true),
+  closeShop: id => confirmIt(`Close ${S.shops[id]?.name || 'this business'}?`, 'Its items come off Main Street. Past sales stay in the records.', 'Close it', async () => {
     for (const i of Object.values(S.items).filter(i => i.shopId === id)) await db.doc('items/' + i.id).delete();
-    await db.doc('shops/' + id).delete(); toast('Shop closed');
+    await db.doc('shops/' + id).delete(); toast('Closed');
   }, true),
   decline: id => run(async () => { await db.doc('loans/' + id).update({status: 'declined'}); toast('Loan declined'); }),
   missed: id => confirmIt('Record a missed payment?', `This lowers ${nameOf(S.loans[id]?.playerId)}'s credit score by 60 points.`, 'Record it', async () => {
     await db.doc('loans/' + id).update({missed: (S.loans[id].missed || 0) + 1}); toast('Missed payment recorded');
   }, true),
-  payday: () => {
-    const ps = playerList().filter(p => (p.wage || 0) > 0);
-    confirmIt('Run payday?', `${ps.length} paychecks will be deposited to checking.`, 'Pay everyone', async () => {
-      const tr = rate('taxRate');
-      for (const p of ps) { const tax = Math.round(p.wage * tr / 100); await addTx('bank', p.id + '.c', p.wage - tax, 'pay', `Paycheck: ${p.job || 'Wages'} (${money(p.wage)} gross, ${money(tax)} tax)`, {gross: p.wage, tax}); }
-      await db.doc('town/settings').update({lastPayday: Date.now(), paydays: (S.settings.paydays || 0) + 1});
-      toast('Payday done. Everyone got paid.');
-    });
-  },
-  interest: () => confirmIt('Run interest day?', 'Loans grow by their rate, and savings accounts earn interest.', 'Run it', async () => {
-    const b = balances(), sr = rate('savingsRate');
-    for (const l of Object.values(S.loans).filter(l => l.status === 'active')) {
-      const i = Math.round(l.balance * l.rate / 100); if (i > 0) await db.doc('loans/' + l.id).update({balance: l.balance + i, interest: (l.interest || 0) + i});
-    }
-    for (const p of playerList()) { const i = Math.round(bal(b, p.id, 's') * sr / 100); if (i > 0) await addTx('bank', p.id + '.s', i, 'interest', `Savings interest at ${sr}%`); }
-    await db.doc('town/settings').update({lastInterest: Date.now()});
-    toast('Interest day done');
-  }),
   delPlayer: id => confirmIt(`Remove ${nameOf(id)}?`, 'They leave town. Their past transactions stay in the ledger.', 'Remove', async () => {
     await db.doc('players/' + id).delete(); toast('Resident removed');
   }, true),
@@ -653,7 +779,7 @@ const acts = {
 const forms = {
   setup: async () => {
     const pin = val('su-pin'); if (!/^\d{4}$/.test(pin)) fail('The banker PIN needs 4 digits.');
-    await db.doc('town/settings').set({name: val('su-name').trim(), symbol: val('su-sym').trim() || '$', bankerPin: pin, taxRate: 10, savingsRate: 2, loanRate: 5, paydays: 0, createdAt: Date.now()});
+    await db.doc('town/settings').set({name: val('su-name').trim(), symbol: val('su-sym').trim() || '$', bankerPin: pin, ...DEFAULTS, utilities: DEFAULT_UTIL, paydays: 0, createdAt: Date.now()});
     S.me = 'bank'; S.tab = 'people'; toast('Your bank is open. Add your residents.');
   },
   check: async () => {
@@ -671,16 +797,17 @@ const forms = {
     await addTx(S.me + '.' + from, S.me + '.' + dir, amt, 'move', dir === 's' ? 'Moved to savings' : 'Moved to checking');
     clear('mv-amt'); toast('Money moved');
   },
-  openShop: async () => {
-    await db.collection('shops').add({name: val('os-name').trim(), desc: val('os-desc').trim(), ownerId: S.me, at: Date.now()});
-    toast('Your shop is open');
+  openBiz: async t => {
+    if (Object.values(S.shops).some(s => s.ownerId === S.me && bizType(s) === t)) fail(`You already have a ${BIZ[t].noun}.`);
+    await db.collection('shops').add({type: t, name: val('ob-n-' + t).trim(), desc: val('ob-d-' + t).trim(), ownerId: S.me, at: Date.now()});
+    clear('ob-n-' + t, 'ob-d-' + t); toast(`Your ${BIZ[t].noun} is open`);
   },
-  addItem: async () => {
-    const shop = Object.values(S.shops).find(s => s.ownerId === S.me); if (!shop) fail('Open a shop first.');
-    const price = toCents(val('ai-price')); if (!(price >= 0)) fail('Enter a price.');
-    const st = val('ai-stock').trim();
-    await db.collection('items').add({shopId: shop.id, name: val('ai-name').trim(), price, stock: st === '' ? null : Math.max(0, parseInt(st, 10)), at: Date.now()});
-    clear('ai-name', 'ai-price', 'ai-stock'); toast('Item added');
+  addItem: async sid => {
+    const shop = S.shops[sid]; if (!shop || shop.ownerId !== S.me) fail('That business is closed.');
+    const price = toCents(val('ai-p-' + sid)); if (!(price >= 0)) fail('Enter a price.');
+    const st = val('ai-s-' + sid).trim();
+    await db.collection('items').add({shopId: sid, name: val('ai-n-' + sid).trim(), price, stock: st === '' ? null : Math.max(0, parseInt(st, 10)), at: Date.now()});
+    clear('ai-n-' + sid, 'ai-p-' + sid, 'ai-s-' + sid); toast('Added');
   },
   editItem: async id => {
     const price = toCents(val('ei-p-' + id)); if (!(price >= 0)) fail('Enter a price.');
@@ -692,7 +819,7 @@ const forms = {
     const amt = toCents(val('lr-amt')), cr = credit(S.me);
     if (!(amt > 0)) fail('Enter how much you want to borrow.');
     if (amt > cr.avail) fail(`Your credit limit lets you borrow up to ${money(cr.avail)}.`);
-    await db.collection('loans').add({playerId: S.me, amount: amt, purpose: val('lr-why').trim(), rate: rate('loanRate'), balance: 0, interest: 0, payments: 0, missed: 0, status: 'requested', at: Date.now()});
+    await db.collection('loans').add({playerId: S.me, amount: amt, purpose: val('lr-why').trim(), rate: cfg('loanRate'), balance: 0, interest: 0, payments: 0, missed: 0, status: 'requested', at: Date.now()});
     clear('lr-amt', 'lr-why'); toast('Sent to the banker');
   },
   repay: async id => {
@@ -737,9 +864,17 @@ const forms = {
   },
   settings: async () => {
     const pin = val('st-pin'); if (!/^\d{4}$/.test(pin)) fail('The banker PIN needs 4 digits.');
-    const n = k => { const v = parseFloat(val(k)); return isFinite(v) && v >= 0 ? v : 0; };
-    await db.doc('town/settings').update({name: val('st-name').trim(), symbol: val('st-sym').trim() || '$', taxRate: n('st-tax'), savingsRate: n('st-sav'), loanRate: n('st-loan'), bankerPin: pin});
-    clear('st-name', 'st-sym', 'st-tax', 'st-sav', 'st-loan', 'st-pin'); toast('Rules saved');
+    const n = (k, min = 0) => { const v = parseFloat(val(k)); return isFinite(v) && v >= min ? v : min; };
+    const ints = (k, min) => Math.max(min, Math.round(n(k, min)));
+    const utilities = [0, 1, 2, 3].map(i => ({name: val('ut-n-' + i).trim(), amount: toCents(val('ut-a-' + i) || '0') || 0})).filter(u => u.name && u.amount > 0);
+    const late = toCents(val('st-late') || '0');
+    await db.doc('town/settings').update({
+      name: val('st-name').trim(), symbol: val('st-sym').trim() || '$', bankerPin: pin, day: ints('st-day', 1),
+      payEvery: ints('st-payev', 1), billEvery: ints('st-billev', 1), billGrace: ints('st-grace', 0), interestEvery: ints('st-intev', 1),
+      taxRate: n('st-tax'), savingsRate: n('st-sav'), loanRate: n('st-loan'), lateFee: late > 0 ? late : 0, utilities,
+    });
+    clear('st-name', 'st-sym', 'st-pin', 'st-day', 'st-payev', 'st-billev', 'st-grace', 'st-intev', 'st-tax', 'st-sav', 'st-loan', 'st-late', 'ut-n-0', 'ut-n-1', 'ut-n-2', 'ut-n-3', 'ut-a-0', 'ut-a-1', 'ut-a-2', 'ut-a-3');
+    toast('Settings saved');
   },
 };
 
@@ -770,8 +905,8 @@ app.addEventListener('submit', e => {
     schedule();
   }, onErr);
   const map = (name, key) => db.collection(name).onSnapshot(q => { const o = {}; q.docs.forEach(d => o[d.id] = {id: d.id, ...d.data()}); S[key] = o; schedule(); }, onErr);
-  const list = (name, key) => db.collection(name).onSnapshot(q => { S[key] = q.docs.map(d => ({id: d.id, ...d.data()})).sort((a, b) => b.at - a.at); schedule(); }, onErr);
-  map('players', 'players'); list('tx', 'tx'); map('shops', 'shops'); map('items', 'items'); list('orders', 'orders'); map('loans', 'loans');
+  const list = (name, key) => db.collection(name).onSnapshot(q => { S[key] = q.docs.map(d => ({id: d.id, ...d.data()})).sort((a, b) => (b.at || 0) - (a.at || 0)); schedule(); }, onErr);
+  map('players', 'players'); list('tx', 'tx'); map('shops', 'shops'); map('items', 'items'); list('orders', 'orders'); map('loans', 'loans'); list('bills', 'bills');
   render();
 })();
 })();
