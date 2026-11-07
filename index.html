@@ -172,6 +172,33 @@ s.muted{font-size:.85em}
 .lotto{background:var(--coin);color:#1b1205;border-color:transparent}
 .lotto .eyebrow{color:#1b1205;opacity:.8}
 .problem{font-family:var(--f-num);font-size:1.3rem;font-weight:500}
+.paper{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:20px;display:grid;gap:16px;box-shadow:0 6px 20px var(--shade)}
+.masthead{text-align:center;border-bottom:3px double var(--ink);padding-bottom:10px;display:grid;gap:4px}
+.masthead h1{font-family:Georgia,"Times New Roman",serif;font-weight:700;letter-spacing:-.01em;font-size:clamp(1.8rem,6vw,3rem)}
+.dateline{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:.8rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);border-bottom:1px solid var(--ink);padding-bottom:6px}
+.headline{font-family:Georgia,"Times New Roman",serif;font-size:clamp(1.5rem,4.5vw,2.3rem);line-height:1.1;text-wrap:balance}
+.deck{font-family:Georgia,serif;font-size:1.05rem;color:var(--muted)}
+.newscols{display:grid;gap:18px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:820px){.newscols{grid-template-columns:repeat(3,minmax(0,1fr))}.newscols>.wide{grid-column:span 2}}
+.newscols section{display:grid;gap:8px;align-content:start;min-width:0}
+.newscols h3{font-family:Georgia,serif;font-size:1.05rem;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--ink);padding-bottom:4px}
+.story{font-family:Georgia,serif;font-size:.98rem;line-height:1.5;overflow-wrap:anywhere}
+.story b{font-family:var(--f-body)}
+.weather{display:flex;gap:12px;align-items:center}
+.weather .t{font-family:var(--f-num);font-size:2rem}
+.balls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.ball{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;font:700 1.35rem var(--f-num);background:radial-gradient(circle at 35% 30%,#fff 0 12%,var(--coin) 13% 100%);color:#1b1205;box-shadow:0 4px 10px var(--shade)}
+.ball.hidden{background:var(--paper);color:var(--muted);border:2px dashed var(--line);box-shadow:none}
+.ball.sm{width:34px;height:34px;font-size:.9rem}
+.ball.hit{background:radial-gradient(circle at 35% 30%,#fff 0 12%,var(--good) 13% 100%);color:#fff}
+.ball.miss{background:var(--paper);color:var(--muted);border:1px solid var(--line);box-shadow:none}
+@media (prefers-reduced-motion:no-preference){.ball.pop{animation:pop .45s cubic-bezier(.2,1.6,.4,1) both}@keyframes pop{from{transform:scale(.2) rotate(-90deg);opacity:0}to{transform:none;opacity:1}}}
+.numgrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;max-width:420px}
+.numgrid button{min-height:48px;border-radius:50%;aspect-ratio:1;border:2px solid var(--line);background:var(--paper);color:var(--ink);font:700 1.1rem var(--f-num);cursor:pointer;max-width:100%}
+.numgrid button.on{background:var(--coin);border-color:var(--coin);color:#1b1205}
+.scratch{display:flex;gap:10px}
+.scratch button{width:72px;height:72px;border-radius:12px;border:0;font:700 2rem var(--f-body);cursor:pointer;background:repeating-linear-gradient(45deg,#B8BEC2 0 6px,#A4ABB0 6px 12px);color:transparent}
+.scratch button.done{background:var(--paper);color:var(--ink);border:2px solid var(--line);cursor:default}
 </style>
 </head><body>
 <div id="app"><div class="center"><div><h2>Opening the bank…</h2><p class="muted">Counting the money.</p></div></div></div>
@@ -196,13 +223,14 @@ const app = document.getElementById('app');
 let db = null;
 const S = {
   dbState: 'loading', settings: undefined, settingsConfirmed: false,
-  players: {}, tx: [], shops: {}, items: {}, orders: [], loans: {}, bills: [], holdings: [], teller: [], cds: [], messages: [], thread: null, inspecting: null, lottoTickets: [], gigs: [],
+  players: {}, tx: [], shops: {}, items: {}, orders: [], loans: {}, bills: [], holdings: [], teller: [], cds: [], messages: [], thread: null, inspecting: null, paperDay: null, picks: [], reveal: null, lottoTickets: [], gigs: [],
   me: null, tab: null, modal: null, pin: null, toast: null, busy: false, err: null, slow: false,
 };
 const COLORS = ['#2F7D6B','#C0612B','#5B5BB5','#B0457A','#3C7FB0','#8A6D1F','#6C8A2E','#9C4BB3'];
 const DEFAULTS = {day: 1, payEvery: 3, billEvery: 4, billGrace: 2, interestEvery: 7, lateFee: 200, taxRate: 10, savingsRate: 2, loanRate: 5,
   rentEvery: 7, mortgageRate: 2, mortgageTerm: 10, downPct: 20, cdRate: 8, cdDays: 7, cdPenalty: 10, eventChance: 35,
-  lotteryPrice: 100, lotteryEvery: 3, lotteryMax: 20, lotteryShare: 50, lotterySeed: 1000, gigsPerDay: 3, stockSwing: 8, surpriseChance: 0, renewPct: 50};
+  lotteryPrice: 100, lotteryEvery: 3, lotteryMax: 20, lotteryShare: 50, lotterySeed: 1000, gigsPerDay: 3, stockSwing: 8, surpriseChance: 0, renewPct: 50,
+  pick3Price: 200, pick3Max: 12, pick3Share: 40, pick3Seed: 5000, pick3Match2: 400, pick3Match1: 100, pick3Boost: 1000, scratchPrice: 100};
 const DEFAULT_UTIL = [{name: 'Electric', amount: 800}, {name: 'Water', amount: 500}, {name: 'Internet', amount: 600}];
 const DEFAULT_HOMES = [{name: 'Apartment', rent: 1000, price: 15000}, {name: 'Townhouse', rent: 1600, price: 25000}, {name: 'House with a yard', rent: 2400, price: 40000}];
 const SHARES = 20;
@@ -240,7 +268,8 @@ const GRADE_CLS = {A: 'good', B: 'note', C: 'warn', D: 'warn', F: 'bad'};
 const GRADE_PRICE = {A: 1.05, B: 1, C: .97, D: .92, F: .8};
 const licExpired = sh => sh.license?.status === 'expired';
 const isOpenBiz = sh => !sh.suspended && !licExpired(sh);
-const closedWhy = sh => sh.suspended ? 'Closed after a failed inspection' : licExpired(sh) ? 'Closed: license expired' : '';
+const FAIL_GRADES = ['D', 'F'];
+const closedWhy = sh => sh.suspended ? `Closed after failing inspection (grade ${sh.inspection?.grade || 'D'})` : licExpired(sh) ? 'Closed: license expired' : '';
 const inspOverdue = sh => sh.inspection?.nextDue != null && sh.inspection.nextDue < today();
 const renewFee = t => Math.round(bizCost(t) * cfg('renewPct') / 100);
 const sendMsg = (from, to, text, day) => db.collection('messages').add({from, to, text, day: day ?? today(), at: Date.now()});
@@ -337,9 +366,19 @@ const cdsOf = pid => S.cds.filter(c => c.playerId === pid);
 const tellerOf = pid => S.teller.filter(t => t.playerId === pid);
 const waitingTeller = () => S.teller.filter(t => t.status === 'waiting');
 // lottery
-const lotto = () => ({drawNo: Number(S.settings?.lottery?.drawNo || 1), carry: Number(S.settings?.lottery?.carry ?? cfg('lotterySeed'))});
-const lottoTickets = () => { const n = lotto().drawNo; return S.lottoTickets.filter(t => t.drawNo === n); };
-const lottoPot = () => lotto().carry + lottoTickets().reduce((s, t) => s + Math.round(t.price * cfg('lotteryShare') / 100), 0);
+const lotto = () => { const L = S.settings?.lottery || {}; return {drawNo: Number(L.drawNo || 1), carry: L.v === 2 ? Number(L.carry || 0) : Math.max(Number(L.carry || 0), cfg('pick3Seed'))}; };
+const lottoTickets = () => { const n = lotto().drawNo; return S.lottoTickets.filter(t => t.drawNo === n && t.kind !== 'scratch'); };
+const lottoPot = () => lotto().carry + lottoTickets().reduce((s, t) => s + Math.round((t.price || 0) * cfg('pick3Share') / 100), 0);
+const matchCount = (nums, drawn) => (nums || []).filter(n => (drawn || []).includes(n)).length;
+const drawNums = h => h ? (h.numbers || (h.number != null ? [h.number] : [])) : [];
+const SCRATCH = [['★', 1000, 2], ['$', 500, 4], ['♣', 300, 6], ['♥', 200, 8]];
+function scratchDraw() {
+  const r = Math.random() * 100; let acc = 0;
+  for (const [sym, prize, pct] of SCRATCH) { acc += pct; if (r < acc) return {symbols: [sym, sym, sym], prize}; }
+  const syms = SCRATCH.map(x => x[0]); let a;
+  do { a = [0, 1, 2].map(() => pickRandom(syms)); } while (a[0] === a[1] && a[1] === a[2]);
+  return {symbols: a, prize: 0};
+}
 const activeGigs = pid => S.gigs.filter(g => g.claimedBy === pid && (g.status === 'claimed' || g.status === 'review'));
 // messages
 const readMap = () => { try { return JSON.parse(ls('ptb.read.' + S.me) || '{}') || {}; } catch (e) { return {}; } };
@@ -367,7 +406,7 @@ function messagesView() {
     : '<div class="empty">Pick a conversation.</div>'}</section>`;
   let log = '';
   if (S.me === 'bank') {
-    const dms = S.messages.filter(m => m.to !== 'board' && m.to !== 'bank' && m.from !== 'bank').sort((a, b) => b.at - a.at).slice(0, 40);
+    const dms = S.messages.filter(m => m.to !== 'board' && m.to !== 'bank' && m.to !== 'paper' && m.from !== 'bank').sort((a, b) => b.at - a.at).slice(0, 40);
     log = `<section class="panel"><h3>All private messages</h3><p class="muted" style="font-size:.85rem">Messages between residents. Only you see this list.</p><div class="list">${dms.length ? dms.map(m => `<div class="li"><div class="main"><b>${esc(contactName(m.from))} → ${esc(contactName(m.to))}</b><small>${esc(m.text)} · Day ${m.day || '?'}</small></div></div>`).join('') : '<div class="empty">No private messages yet.</div>'}</div></section>`;
   }
   return `<div class="msgs">${list}${thread}</div>${log}`;
@@ -536,18 +575,23 @@ async function doCds(day) {
   return n ? `${n} CD${n > 1 ? 's' : ''} matured` : '';
 }
 async function doLottery(day, patch) {
-  const L = lotto(), tickets = lottoTickets(); if (!tickets.length) return '';
-  const pot = lottoPot(), num = 1 + Math.floor(Math.random() * every('lotteryMax'));
-  const winners = tickets.filter(t => t.number === num), prize = winners.length ? Math.floor(pot / winners.length) : 0;
-  for (const t of winners) {
-    await addTx('bank', t.playerId + '.c', prize, 'lottery', `Lottery win! Number ${num} in drawing #${L.drawNo}`);
-    await db.collection('messages').add({from: 'bank', to: t.playerId, text: `You won the lottery! Your number ${num} paid ${money(prize)}. It’s in your checking.`, day, at: Date.now()});
-  }
-  patch.lottery = {drawNo: L.drawNo + 1, carry: winners.length ? cfg('lotterySeed') : pot};
-  patch.lotteryHistory = [{drawNo: L.drawNo, day, number: num, tickets: tickets.length, pot, winners: winners.map(t => t.playerId), prize}, ...(S.settings.lotteryHistory || [])].slice(0, 10);
-  const names = [...new Set(winners.map(t => nameOf(t.playerId)))].join(' and ');
-  patch.news = [{day, title: 'Lottery drawing', text: winners.length ? `The number was ${num}. ${names} won ${money(prize)}${winners.length > 1 ? ' each' : ''}!` : `The number was ${num}. Nobody won, so the ${money(pot)} jackpot rolls over.`}, ...(patch.news || S.settings.news || [])].slice(0, 12);
-  return 'lottery drawing';
+  const L = lotto(), all = lottoTickets(); if (!all.length) return '';
+  const legacy = all.filter(t => !Array.isArray(t.numbers)), tickets = all.filter(t => Array.isArray(t.numbers));
+  for (const t of legacy) await addTx('bank', t.playerId + '.c', t.price || 0, 'lottery', 'Refund for an old-style lottery ticket');
+  const max = Math.max(4, every('pick3Max')), pot = lottoPot();
+  const drawn = Array.from({length: max}, (_, i) => i + 1).sort(() => Math.random() - .5).slice(0, 3).sort((a, b) => a - b);
+  const jack = tickets.filter(t => matchCount(t.numbers, drawn) === 3), two = tickets.filter(t => matchCount(t.numbers, drawn) === 2), one = tickets.filter(t => matchCount(t.numbers, drawn) === 1);
+  const jp = jack.length ? Math.floor(pot / jack.length) : 0;
+  for (const t of jack) await addTx('bank', t.playerId + '.c', jp, 'lottery', `JACKPOT! Matched all 3 in drawing #${L.drawNo}`);
+  for (const t of two) await addTx('bank', t.playerId + '.c', cfg('pick3Match2'), 'lottery', `Lottery: matched 2 in drawing #${L.drawNo}`);
+  for (const t of one) if (cfg('pick3Match1') > 0) await addTx('bank', t.playerId + '.c', cfg('pick3Match1'), 'lottery', `Lottery: matched 1 in drawing #${L.drawNo}`);
+  for (const pid of new Set(jack.map(t => t.playerId))) await sendMsg('bank', pid, `JACKPOT! The numbers were ${drawn.join(', ')} and you won ${money(jp)}!`, day);
+  const nextCarry = jack.length ? cfg('pick3Seed') : pot + cfg('pick3Boost');
+  patch.lottery = {v: 2, drawNo: L.drawNo + 1, carry: nextCarry};
+  patch.lotteryHistory = [{drawNo: L.drawNo, day, numbers: drawn, tickets: tickets.length, pot, jackpotWinners: jack.map(t => t.playerId), prize: jp, small: two.length + one.length}, ...(S.settings.lotteryHistory || [])].slice(0, 10);
+  const names = [...new Set(jack.map(t => nameOf(t.playerId)))].join(' and '), smalls = two.length + one.length;
+  patch.news = [{day, title: jack.length ? 'Lottery jackpot won!' : 'Lottery drawing', text: jack.length ? `The numbers were ${drawn.join(', ')}. ${names} won the ${money(pot)} jackpot!` : `The numbers were ${drawn.join(', ')}. No jackpot winner, so it grows to ${money(nextCarry)}. ${smalls} smaller prize${smalls === 1 ? '' : 's'} paid.`}, ...(patch.news || S.settings.news || [])].slice(0, 12);
+  return jack.length ? 'lottery jackpot won!' : 'lottery drawing';
 }
 async function doGigs(day) {
   for (const g of S.gigs.filter(g => g.kind === 'random' && g.status === 'open' && g.expiresDay < day)) await db.doc('gigs/' + g.id).delete();
@@ -674,8 +718,8 @@ function shell(isBank) {
   const bankQueue = waitingTeller().length + Object.values(S.loans).filter(l => l.status === 'requested').length;
   const myWaiting = tellerOf(S.me).filter(t => t.status === 'waiting').length + loansOf(S.me).filter(l => l.status === 'requested').length;
   const tabs = isBank
-    ? [['town','Town'],['calendar','Day & schedule'],['teller','Teller window', bankQueue],['jobs','Odd jobs', S.gigs.filter(g => g.status === 'review').length],['inspector','Inspector', Object.values(S.shops).filter(sh => sh.renewalRequested || inspOverdue(sh) || sh.inspection?.nextDue === today()).length],['messages','Messages', unreadTotal()],['people','Residents'],['shops','Businesses'],['settings','Settings']]
-    : [['home','Accounts'],['messages','Messages', unreadTotal()],['bills','Bills', openBills(S.me).length],['jobs','Odd jobs', activeGigs(S.me).filter(g => g.status === 'claimed').length],['housing','Housing'],['pay','Write a check'],['shop','Main Street'],['myshop','My businesses', myOrders],['stocks','Stocks'],['lottery','Lottery'],['bank','Bank & credit', myWaiting]];
+    ? [['town','Town'],['paper','Gazette'],['calendar','Day & schedule'],['teller','Teller window', bankQueue],['jobs','Odd jobs', S.gigs.filter(g => g.status === 'review').length],['inspector','Inspector', Object.values(S.shops).filter(sh => sh.renewalRequested || inspOverdue(sh) || sh.inspection?.nextDue === today()).length],['messages','Messages', unreadTotal()],['people','Residents'],['shops','Businesses'],['settings','Settings']]
+    : [['home','Accounts'],['paper','Gazette'],['messages','Messages', unreadTotal()],['bills','Bills', openBills(S.me).length],['jobs','Odd jobs', activeGigs(S.me).filter(g => g.status === 'claimed').length],['housing','Housing'],['pay','Write a check'],['shop','Main Street'],['myshop','My businesses', myOrders],['stocks','Stocks'],['lottery','Lottery', ((() => { const l = (S.settings.lotteryHistory || [])[0]; return l && l.numbers && l.drawNo > Number(ls('ptb.lotto.seen.' + S.me) || 0) && S.lottoTickets.some(t => t.drawNo === l.drawNo && t.playerId === S.me) ? 1 : 0; })()) + S.lottoTickets.filter(t => t.kind === 'scratch' && t.playerId === S.me && !t.done).length],['bank','Bank & credit', myWaiting]];
   if (!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
   const who = isBank ? 'Banker mode' : nameOf(S.me) + (S.players[S.me]?.job ? ' · ' + S.players[S.me].job : '');
   const content = isBank ? bankView() : playerView();
@@ -700,6 +744,7 @@ function billCard(b, canPay) {
 
 function playerView() {
   if (S.tab === 'messages') return messagesView();
+  if (S.tab === 'paper') return paperView();
   if (S.tab === 'jobs') return jobsView();
   if (S.tab === 'lottery') return lotteryView();
   const pid = S.me, p = S.players[pid], b = balances();
@@ -728,7 +773,8 @@ function playerView() {
         <div class="li"><span class="badge">PAY</span><div class="main"><b>Payday</b><small>Every ${every('payEvery')} days${S.settings.payBonus ? ' · ' + S.settings.payBonus + '% bonus coming' : ''}</small></div><span class="amt">${dayIn(nextOn('payEvery'))}</span></div>
         <div class="li"><span class="badge">BIL</span><div class="main"><b>Utility bills arrive</b><small>Every ${every('billEvery')} days · about ${money(billTotal())}</small></div><span class="amt">${dayIn(nextOn('billEvery'))}</span></div>
         ${p.home && p.home.mode !== 'own' ? `<div class="li"><span class="badge">HOM</span><div class="main"><b>${p.home.mode === 'rent' ? 'Rent' : 'Mortgage'} bill</b><small>${esc(p.home.name)}</small></div><span class="amt">${dayIn(nextOn('rentEvery'))}</span></div>` : ''}
-        <div class="li"><span class="badge">INT</span><div class="main"><b>Interest day</b><small>Savings earn, loans grow</small></div><span class="amt">${dayIn(nextOn('interestEvery'))}</span></div></div></section>
+        <div class="li"><span class="badge">INT</span><div class="main"><b>Interest day</b><small>Savings earn, loans grow</small></div><span class="amt">${dayIn(nextOn('interestEvery'))}</span></div>
+        <div class="li"><span class="badge">LOT</span><div class="main"><b>Lottery drawing</b><small>Jackpot ${money(lottoPot())}</small></div><span class="amt">${dayIn(nextOn('lotteryEvery'))}</span></div></div></section>
       <section class="panel"><h3>Move money</h3>
         <form data-form="move">
           <div class="fields"><label>Direction<select id="mv-dir"><option value="s">Checking → Savings</option><option value="c">Savings → Checking</option></select></label>
@@ -921,21 +967,107 @@ function jobsView() {
 }
 
 function lotteryView() {
-  const pid = S.me, L = lotto(), all = lottoTickets(), mine = all.filter(t => t.playerId === pid), max = every('lotteryMax'), hist = S.settings.lotteryHistory || [];
+  const pid = S.me, L = lotto(), all = lottoTickets(), mine = all.filter(t => t.playerId === pid), max = Math.max(4, every('pick3Max')), hist = S.settings.lotteryHistory || [], last = hist[0];
+  const C = max * (max - 1) * (max - 2) / 6, p2 = 3 * (max - 3) / C, p1 = 3 * ((max - 3) * (max - 4) / 2) / C;
   const spent = S.tx.filter(t => t.kind === 'lottery' && t.from === pid + '.c').reduce((s, t) => s + t.amount, 0);
   const won = S.tx.filter(t => t.kind === 'lottery' && t.to === pid + '.c').reduce((s, t) => s + t.amount, 0);
+  const seen = Number(ls('ptb.lotto.seen.' + pid) || 0), drawn = drawNums(last);
+  const unseen = last && last.numbers && last.drawNo > seen && !(S.reveal && S.reveal.drawNo === last.drawNo);
+  const revealing = S.reveal && last && S.reveal.drawNo === last.drawNo ? S.reveal.shown : 3;
+  const myLast = last ? S.lottoTickets.filter(t => t.drawNo === last.drawNo && t.playerId === pid && Array.isArray(t.numbers)) : [];
+  const prizeFor = m => m === 3 ? last.prize : m === 2 ? cfg('pick3Match2') : m === 1 ? cfg('pick3Match1') : 0;
+  const scratch = S.lottoTickets.filter(t => t.kind === 'scratch' && t.playerId === pid && !t.done).sort((a, b) => a.at - b.at);
+  const picks = S.picks || [];
+  const jw = last ? (last.jackpotWinners || last.winners || []) : [];
+  const lastBlock = !last ? '' : unseen
+    ? `<section class="panel lotto" style="text-align:center"><p class="eyebrow">Drawing #${last.drawNo} · Day ${last.day}</p><h2>The drawing is in!</h2><div class="balls" style="justify-content:center">${[0, 1, 2].map(() => '<span class="ball hidden">?</span>').join('')}</div><div><button class="btn" style="background:#1b1205;color:#fff" data-act="lottoReveal">Reveal the numbers</button></div></section>`
+    : `<section class="panel"><div class="panel-head"><h3>Last drawing · #${last.drawNo}</h3><span class="muted" style="font-size:.85rem">Day ${last.day} · ${last.tickets} tickets</span></div>
+        <div class="balls">${drawn.map((n, i) => i < revealing ? `<span class="ball pop">${n}</span>` : '<span class="ball hidden">?</span>').join('')}</div>
+        ${revealing >= 3 ? `<p>${jw.length ? `<b>Jackpot won by ${esc([...new Set(jw.map(nameOf))].join(' & '))}: ${money(last.prize)}!</b>` : 'No jackpot winner. It rolled over and grew.'}</p>
+        ${myLast.length ? `<div class="list">${myLast.map(t => { const m = matchCount(t.numbers, drawn), pz = prizeFor(m); return `<div class="li"><div class="balls">${t.numbers.map(n => `<span class="ball sm ${drawn.includes(n) ? 'hit' : 'miss'}">${n}</span>`).join('')}</div><div class="main"><b>${m === 3 ? 'JACKPOT!' : m ? 'Matched ' + m : 'No match'}</b></div><span class="amt ${pz ? 'pos' : 'muted'}">${pz ? money(pz, true) : '—'}</span></div>`; }).join('')}</div>` : '<p class="muted">You didn’t have a ticket in that drawing.</p>'}` : ''}</section>`;
   return `<div class="cols"><div class="stack">
-    <section class="panel lotto"><p class="eyebrow">${esc(S.settings.name)} Town Lottery · Drawing #${L.drawNo}</p><div class="bigday num">${money(lottoPot())}</div>
-      <p>Jackpot · drawing ${dayIn(nextOn('lotteryEvery'))} · ${all.length} ticket${all.length === 1 ? '' : 's'} sold</p></section>
-    <section class="panel"><h3>Buy a ticket · ${money(cfg('lotteryPrice'))}</h3>
-      <form class="inline" data-form="lotto"><label>Pick a number from 1 to ${max}<select id="lt-num"><option value="q">Quick pick (random)</option>${Array.from({length: max}, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}</select></label><button class="btn gold">Buy ticket</button></form>
-      ${mine.length ? `<p>Your numbers for this drawing: ${mine.map(t => `<span class="pill note">${t.number}</span>`).join(' ')}</p>` : '<p class="muted">You have no tickets for this drawing.</p>'}</section>
-    <section class="panel"><h3>Past drawings</h3>${hist.length ? `<div class="list">${hist.map(h => `<div class="li"><span class="badge">${h.number}</span><div class="main"><b>${h.winners.length ? esc([...new Set(h.winners.map(nameOf))].join(' & ')) + ' won ' + money(h.prize) + (h.winners.length > 1 ? ' each' : '') : 'No winner, so the jackpot rolled over'}</b><small>Drawing #${h.drawNo} · Day ${h.day} · ${h.tickets} ticket${h.tickets === 1 ? '' : 's'} · jackpot ${money(h.pot)}</small></div></div>`).join('')}</div>` : '<div class="empty">No drawings yet.</div>'}</section>
+    <section class="panel lotto"><p class="eyebrow">${esc(S.settings.name)} Pick 3 Lottery · Drawing #${L.drawNo}</p><div class="bigday num">${money(lottoPot())}</div>
+      <p>Jackpot · drawing ${dayIn(nextOn('lotteryEvery'))} · ${all.length} ticket${all.length === 1 ? '' : 's'} sold · grows ${money(cfg('pick3Boost'))} extra if nobody wins</p></section>
+    ${lastBlock}
+    <section class="panel"><div class="panel-head"><h3>Pick 3 numbers · ${money(cfg('pick3Price'))} a ticket</h3><span class="muted" style="font-size:.85rem">${picks.length}/3 picked</span></div>
+      <div class="numgrid">${Array.from({length: max}, (_, i) => i + 1).map(n => `<button type="button" class="${picks.includes(n) ? 'on' : ''}" data-act="pickNum" data-id="${n}" aria-pressed="${picks.includes(n)}">${n}</button>`).join('')}</div>
+      <div class="row"><button class="btn ghost" data-act="quickPick">Quick pick</button><button class="btn gold" data-act="buyLotto" ${picks.length === 3 ? '' : 'disabled'}>Buy ticket</button></div>
+      ${mine.length ? `<div><p class="eyebrow" style="margin-bottom:6px">Your tickets for this drawing</p><div class="list">${mine.map(t => `<div class="li"><div class="balls">${(t.numbers || [t.number]).map(n => `<span class="ball sm">${n}</span>`).join('')}</div></div>`).join('')}</div></div>` : '<p class="muted">You have no tickets for this drawing yet.</p>'}</section>
+    <section class="panel"><div class="panel-head"><h3>Scratch-offs · ${money(cfg('scratchPrice'))}</h3><button class="btn gold sm" data-act="buyScratch">Buy a scratch-off</button></div>
+      <p class="muted" style="font-size:.88rem">Tap each silver box to scratch it. Three of a kind wins: ${SCRATCH.map(([sy, pz]) => `${sy}${sy}${sy} ${money(pz)}`).join(' · ')}</p>
+      ${scratch.length ? scratch.map(t => `<div class="scratch">${t.symbols.map((sy, i) => `<button type="button" class="${t.revealed?.[i] ? 'done' : ''}" data-act="scratch" data-id="${t.id}:${i}" aria-label="Scratch spot ${i + 1}">${t.revealed?.[i] ? sy : ''}</button>`).join('')}</div>`).join('') : '<p class="muted">No unscratched tickets.</p>'}</section>
   </div><div class="stack">
-    <section class="panel"><h3>The real odds</h3><p>Each ticket has a <b>1 in ${max}</b> chance of winning.</p>
-      <p class="muted">Only ${cfg('lotteryShare')}% of every ticket goes into the jackpot. The town keeps the rest. That’s how lotteries make money, and why most players end up losing more than they win. If nobody picks the winning number, the jackpot rolls over and grows.</p>
-      <div class="stats"><div class="stat"><b>${money(spent)}</b><span>You’ve spent on tickets</span></div><div class="stat"><b>${money(won)}</b><span>You’ve won</span></div><div class="stat"><b class="${won - spent >= 0 ? 'pos' : 'neg'}">${money(won - spent, true)}</b><span>Overall</span></div></div></section>
+    <section class="panel"><h3>Prizes & the real odds</h3><div class="list">
+      <div class="li"><div class="main"><b>Match all 3</b><small>About 1 in ${Math.round(C)} tickets</small></div><span class="amt">Jackpot</span></div>
+      <div class="li"><div class="main"><b>Match 2</b><small>About 1 in ${Math.round(1 / p2)} tickets</small></div><span class="amt">${money(cfg('pick3Match2'))}</span></div>
+      <div class="li"><div class="main"><b>Match 1</b><small>About 1 in ${Math.round(1 / p1)} tickets</small></div><span class="amt">${money(cfg('pick3Match1'))}</span></div>
+      <div class="li"><div class="main"><b>Scratch-off win</b><small>About 1 in ${Math.round(100 / SCRATCH.reduce((a, x) => a + x[2], 0))} tickets</small></div><span class="amt">${money(200)}–${money(1000)}</span></div></div>
+      <p class="muted">Only ${cfg('pick3Share')}% of each Pick 3 ticket goes into the jackpot, and most prizes are smaller than a ticket costs. Lotteries are built so the town wins over time. They’re for fun, not a way to get rich.</p>
+      <div class="stats"><div class="stat"><b>${money(spent)}</b><span>You’ve spent</span></div><div class="stat"><b>${money(won)}</b><span>You’ve won</span></div><div class="stat"><b class="${won - spent >= 0 ? 'pos' : 'neg'}">${money(won - spent, true)}</b><span>Overall</span></div></div></section>
+    <section class="panel"><h3>Past drawings</h3>${hist.length ? `<div class="list">${hist.map(h => `<div class="li"><div class="balls">${drawNums(h).map(n => `<span class="ball sm">${n}</span>`).join('')}</div><div class="main"><b>${(h.jackpotWinners || h.winners || []).length ? esc([...new Set((h.jackpotWinners || h.winners).map(nameOf))].join(' & ')) + ' won ' + money(h.prize) : 'Rolled over'}</b><small>#${h.drawNo} · Day ${h.day} · jackpot ${money(h.pot)}</small></div></div>`).join('')}</div>` : '<div class="empty">No drawings yet.</div>'}</section>
   </div></div>`;
+}
+
+const WEATHER = [['Sunny and bright', 62, 84], ['Partly cloudy', 55, 75], ['Rainy, bring an umbrella', 48, 66], ['Windy', 45, 68], ['Snow flurries', 22, 34], ['Foggy morning, clear afternoon', 50, 70], ['Thunderstorms later', 66, 82], ['Perfect picnic weather', 68, 78], ['Chilly and gray', 35, 48]];
+function paperView() {
+  const D = Math.min(today(), Math.max(1, S.paperDay || today())), town = S.settings.name, isToday = D === today();
+  const w = WEATHER[Math.floor((noise('wx|' + D) + 1) / 2 * WEATHER.length) % WEATHER.length], temp = Math.round(w[1] + (noise('wt|' + D) + 1) / 2 * (w[2] - w[1]));
+  const news = (S.settings.news || []).filter(n => n.day === D);
+  const openings = S.tx.filter(t => t.kind === 'biz' && t.day === D && /^License and setup for /.test(t.memo || '')).map(t => ({name: t.memo.replace('License and setup for ', ''), owner: nameOf(t.from.split('.')[0])}));
+  const dayOrders = S.orders.filter(o => o.day === D && o.status !== 'refunded');
+  const byShop = {}; dayOrders.forEach(o => { byShop[o.shopId] = (byShop[o.shopId] || 0) + o.total; });
+  const top = Object.entries(byShop).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id, v]) => ({shop: S.shops[id], v})).filter(x => x.shop);
+  const pays = S.tx.filter(t => t.kind === 'pay' && t.day === D), paid = pays.reduce((a, t) => a + t.amount, 0);
+  const moves = Object.values(S.shops).map(sh => { const a = sharePrice(sh.id, Math.max(1, D - 1)), b = sharePrice(sh.id, D); return {sh, b, ch: a ? (b - a) / a * 100 : 0}; }).sort((a, b) => b.ch - a.ch);
+  const inspected = Object.values(S.shops).filter(sh => sh.inspection?.day === D);
+  const classifieds = S.messages.filter(m => m.to === 'board' && m.day === D).sort((a, b) => a.at - b.at);
+  const stories = S.messages.filter(m => m.to === 'paper' && m.day === D).sort((a, b) => a.at - b.at);
+  const jobsDone = S.gigs.filter(g => g.status === 'paid' && g.paidDay === D).length;
+  const lotto = (S.settings.lotteryHistory || []).find(h => h.day === D);
+  const sales = isToday ? Object.values(S.shops).filter(sh => salePct(sh) && isOpenBiz(sh)) : [];
+  // Front page: the biggest thing that happened
+  let head, deck;
+  const ev = news.find(n => n.title !== 'Lottery drawing');
+  if (ev) { head = ev.title; deck = ev.text; }
+  else if (lotto && (lotto.jackpotWinners || lotto.winners || []).length) { const lw = lotto.jackpotWinners || lotto.winners; head = 'Lottery Jackpot Won!'; deck = `${[...new Set(lw.map(nameOf))].join(' and ')} matched ${drawNums(lotto).join(', ')} and won ${money(lotto.prize)}.`; }
+  else if (openings.length) { head = `Grand Opening: ${openings[0].name}`; deck = `${openings[0].owner} cut the ribbon on a brand-new business in ${town}.`; }
+  else if (top.length) { head = `${top[0].shop.name} Leads the Day in Sales`; deck = `Customers spent ${money(top[0].v)} there on Day ${D}.`; }
+  else if (pays.length) { head = 'Payday in ' + town; deck = `${pays.length} worker${pays.length > 1 ? 's' : ''} took home ${money(paid)} after taxes.`; }
+  else if (lotto) { head = 'Lottery Jackpot Rolls Over'; deck = `Nobody matched ${drawNums(lotto).join(', ')}. The jackpot keeps growing.`; }
+  else { head = `A Quiet Day in ${town}`; deck = 'The streets were calm and the shops were open. What will tomorrow bring?'; }
+  const item = (t, body) => `<p class="story"><b>${esc(t)}.</b> ${body}</p>`;
+  return `<div class="row" style="justify-content:space-between"><button class="btn ghost sm" data-act="paperDay" data-id="${D - 1}" ${D <= 1 ? 'disabled' : ''}>← Day ${Math.max(1, D - 1)}</button>
+      <span class="muted" style="font-size:.85rem">${isToday ? 'Today’s edition' : 'Past edition'}</span>
+      <button class="btn ghost sm" data-act="paperDay" data-id="${D + 1}" ${isToday ? 'disabled' : ''}>Day ${D + 1} →</button></div>
+    <article class="paper">
+      <header class="masthead"><h1>The ${esc(town)} Gazette</h1>
+        <div class="dateline"><span>Day ${D}</span><span>All the news that fits</span><span>Price: free</span></div></header>
+      <div style="display:grid;gap:8px"><h2 class="headline">${esc(head)}</h2><p class="deck">${esc(deck)}</p></div>
+      <div class="newscols">
+        <section class="wide"><h3>Around town</h3>
+          ${news.filter(n => n !== ev).map(n => item(n.title, esc(n.text))).join('')}
+          ${openings.map(o => item('Now open', `${esc(o.owner)} opened <b>${esc(o.name)}</b>. Stop by and say hello!`)).join('')}
+          ${pays.length ? item('Payday', `${pays.length} worker${pays.length > 1 ? 's were' : ' was'} paid a total of ${money(paid)} after town taxes.`) : ''}
+          ${jobsDone ? item('Hard at work', `Residents finished ${jobsDone} odd job${jobsDone > 1 ? 's' : ''} today.`) : ''}
+          ${inspected.filter(sh => !news.some(n => n.title === sh.name + ' shut down' || n.title === sh.name + ' reopens')).map(sh => item('Inspection report', `${esc(sh.name)} earned a${sh.inspection.grade === 'A' || sh.inspection.grade === 'F' ? 'n' : ''} <b>${sh.inspection.grade}</b> from the town inspector.`)).join('')}
+          ${stories.map(m => `<div style="border-top:1px dashed var(--line);padding-top:8px"><p class="story"><b>${esc(m.headline || 'Reader story')}</b> <span class="muted" style="font-size:.85rem">by ${esc(contactName(m.from))}</span></p><p class="story">${esc(m.text)}</p>${S.me === 'bank' ? `<button class="btn danger sm" data-act="dropStory" data-id="${m.id}">Remove story</button>` : ''}</div>`).join('')}
+          ${!news.length && !openings.length && !pays.length && !jobsDone && !inspected.length && !stories.length ? '<p class="story muted">No other news today. Write a story below and be the first!</p>' : ''}</section>
+        <section><h3>Weather</h3><div class="weather"><span class="t">${temp}°</span><span class="story">${w[0]}</span></div>
+          <h3>Business</h3>
+          ${top.length ? top.map((x, i) => `<p class="story">${i + 1}. <b>${esc(x.shop.name)}</b> sold ${money(x.v)}</p>`).join('') : '<p class="story muted">No sales recorded.</p>'}
+          ${sales.length ? `<p class="story"><b>On sale:</b> ${sales.map(sh => `${esc(sh.name)} (${salePct(sh)}% off)`).join(', ')}</p>` : ''}
+          <h3>Market report</h3>
+          ${moves.length ? `<p class="story"><b>Biggest gain:</b> ${esc(moves[0].sh.name)} ${moves[0].ch >= 0 ? '▲' : '▼'} ${Math.abs(moves[0].ch).toFixed(1)}% to ${money(moves[0].b)}</p>${moves.length > 1 ? `<p class="story"><b>Biggest drop:</b> ${esc(moves[moves.length - 1].sh.name)} ${moves[moves.length - 1].ch >= 0 ? '▲' : '▼'} ${Math.abs(moves[moves.length - 1].ch).toFixed(1)}% to ${money(moves[moves.length - 1].b)}</p>` : ''}` : '<p class="story muted">No stocks are trading yet.</p>'}
+          <h3>Bank board</h3>
+          <p class="story">Savings ${cfg('savingsRate')}% · Loans ${cfg('loanRate')}% · CDs ${cfg('cdRate')}%<br>Lottery jackpot: <b>${money(lottoPot())}</b>${lotto ? `<br>Winning numbers: <b>${drawNums(lotto).join(', ')}</b>` : ''}</p></section>
+      </div>
+      <section style="display:grid;gap:8px"><h3 style="font-family:Georgia,serif;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--ink);padding-bottom:4px;font-size:1.05rem">Classifieds</h3>
+        ${classifieds.length ? classifieds.map(m => `<p class="story"><b>${esc(contactName(m.from))}:</b> ${esc(m.text)}</p>`).join('') : '<p class="story muted">No ads today. Post one on the bulletin board in Messages.</p>'}</section>
+    </article>
+    ${isToday ? `<section class="panel" style="max-width:680px"><h3>Write for the Gazette</h3><p class="muted" style="font-size:.88rem">Report on something that happened in town, review a restaurant, or write an ad. It goes in today’s paper for everyone to read.</p>
+      <form data-form="story"><label>Headline<input id="ps-h" required maxlength="60" placeholder="Best Pancakes in Town!"></label>
+        <label>Your story<textarea id="ps-t" required maxlength="400" rows="4" placeholder="I went to the Hungry Moose Diner and…"></textarea></label>
+        <div><button class="btn">Publish</button></div></form></section>` : ''}`;
 }
 
 function inspectorView() {
@@ -956,18 +1088,18 @@ function inspectorView() {
       ${open ? `<form data-form="inspect" data-id="${sh.id}" style="border-top:1px solid var(--line);padding-top:12px">
         <p class="eyebrow">Inspection checklist</p>
         ${CHECKS.map((c, i) => `<label style="display:flex;gap:10px;align-items:center;color:var(--ink);font-size:1rem"><input type="checkbox" id="ic-${sh.id}-${i}" style="width:auto;min-height:0;transform:scale(1.3)"> ${c}</label>`).join('')}
-        <p class="muted" style="font-size:.85rem">5 checks = A, 4 = B, 3 = C, 2 = D, 1 or 0 = F. An F closes the business until a re-inspection in 2 days.</p>
+        <p class="muted" style="font-size:.85rem">5 checks = A, 4 = B, 3 = C, 2 = D, 1 or 0 = F. A D or F shuts the business down and makes the news. It reopens only after earning a C or better on re-inspection in 2 days.</p>
         <div class="fields"><label>Grade<select id="ig-${sh.id}"><option value="auto">Use the checklist</option>${['A', 'B', 'C', 'D', 'F'].map(x => `<option value="${x}">${x}</option>`).join('')}</select></label>
           <label>Notes for the owner<input id="in-${sh.id}" maxlength="120" placeholder="Prices were hard to read"></label></div>
         <div><button class="btn">Save inspection</button></div></form>` : ''}</section>`;
   };
   return `<div><p class="eyebrow">Business inspector · Day ${today()}</p><h2>Licenses & inspections</h2></div>
-    <div class="stats"><div class="stat"><b>${renew}</b><span>Renewals waiting</span></div><div class="stat"><b>${overdue + dueToday}</b><span>Inspections due or overdue</span></div><div class="stat"><b>${expired}</b><span>Expired licenses</span></div><div class="stat"><b>${shops.filter(sh => sh.suspended).length}</b><span>Closed for failing</span></div></div>
+    <div class="stats"><div class="stat"><b>${renew}</b><span>Renewals waiting</span></div><div class="stat"><b>${overdue + dueToday}</b><span>Inspections due or overdue</span></div><div class="stat"><b>${expired}</b><span>Expired licenses</span></div><div class="stat"><b>${shops.filter(sh => sh.suspended).length}</b><span>Shut down (D or F)</span></div></div>
     <div class="cols"><div class="stack">${list.length ? list.map(card).join('') : '<div class="empty">No businesses yet.</div>'}</div>
     <div class="stack"><section class="panel"><h3>Schedules by business type</h3><div class="tbl-wrap"><table><thead><tr><th>Type</th><th class="r">Inspect every</th><th class="r">License lasts</th><th class="r">Renewal</th></tr></thead><tbody>
       ${Object.keys(BIZ).map(t => `<tr><td>${BIZ[t].Noun}</td><td class="r">${bizRule(t, 'inspect')} days</td><td class="r">${bizRule(t, 'license')} days</td><td class="r num">${money(renewFee(t))}</td></tr>`).join('')}</tbody></table></div>
       <p class="muted" style="font-size:.85rem">Change these in Settings. Owners get a message when an inspection is due and when a license is about to run out.</p></section>
-    <section class="panel"><h3>How it works</h3><p class="muted">Walk over to the business and check it in real life. Is the stand tidy? Are the prices posted? Tap the boxes that pass. The grade shows on Main Street and nudges the share price. A business with an expired license or an F grade can’t sell until it’s fixed.</p></section></div></div>`;
+    <section class="panel"><h3>How it works</h3><p class="muted">Walk over to the business and check it in real life. Is the stand tidy? Are the prices posted? Tap the boxes that pass. The grade shows on Main Street and nudges the share price. A D or F shuts a business down and makes the Gazette. It stays closed until it earns a C or better. An expired license also closes it until renewed.</p></section></div></div>`;
 }
 
 function bankJobsView() {
@@ -994,7 +1126,7 @@ function manageBiz(shop) {
   const sid = shop.id, pct = salePct(shop);
   return `<div class="panel-head"><div><p class="eyebrow">Your ${T.noun}</p><h2>${esc(shop.name)}</h2></div><button class="btn danger sm" data-act="closeShop" data-id="${sid}">Close ${T.noun}</button></div>
     <div class="stats"><div class="stat"><b>${money(sales)}</b><span>Total sales</span></div>${T.tips ? `<div class="stat"><b>${money(tips)}</b><span>Tips earned</span></div>` : ''}<div class="stat"><b>${money(sharePrice(sid))}</b><span>Share price · ${sharesOut(sid)} of ${SHARES} owned by investors</span></div><div class="stat"><b>${orders.filter(o => o.status === 'new').length}</b><span>Orders waiting</span></div></div>
-    ${isOpenBiz(shop) ? '' : `<div class="alert bad"><span><b>${closedWhy(shop)}.</b> Customers can’t buy anything until ${shop.suspended ? 'it passes a re-inspection' : 'the license is renewed'}.</span></div>`}
+    ${isOpenBiz(shop) ? '' : `<div class="alert bad"><span><b>${closedWhy(shop)}.</b> Customers can’t buy anything until ${shop.suspended ? 'it earns a C or better on re-inspection' + (shop.inspection?.nextDue ? ' (Day ' + shop.inspection.nextDue + ')' : '') : 'the license is renewed'}.</span></div>`}
     <div class="cols even"><div class="stack">
       <section class="panel"><div class="panel-head"><h3>License & inspection</h3>${shop.inspection?.grade ? `<span class="pill ${GRADE_CLS[shop.inspection.grade]}">Grade ${shop.inspection.grade}</span>` : '<span class="pill mute">Not inspected yet</span>'}</div>
         <div class="list">
@@ -1002,7 +1134,7 @@ function manageBiz(shop) {
             ${shop.renewalRequested ? '<span class="pill warn">Renewal waiting</span>' : `<button class="btn ${licExpired(shop) ? 'gold' : 'ghost'} sm" data-act="askRenew" data-id="${sid}">Renew</button>`}</div>
           <div class="li"><span class="badge">INS</span><div class="main"><b>${shop.inspection?.nextDue != null ? (inspOverdue(shop) ? 'Inspection overdue since Day ' + shop.inspection.nextDue : 'Next inspection ' + dayIn(shop.inspection.nextDue)) : 'First inspection is scheduled tomorrow'}</b><small>Inspected every ${bizRule(t, 'inspect')} days${shop.inspection?.day ? ' · last on Day ' + shop.inspection.day : ''}</small></div></div></div>
         ${shop.inspection?.notes ? `<p class="muted" style="font-size:.88rem">Inspector’s notes: ${esc(shop.inspection.notes)}</p>` : ''}
-        <p class="muted" style="font-size:.85rem">The inspector checks: ${CHECKS.join(', ').toLowerCase()}. Better grades make your share price go up.</p></section>
+        <p class="muted" style="font-size:.85rem">The inspector checks: ${CHECKS.join(', ').toLowerCase()}. Better grades make your share price go up. A D or F shuts you down and puts you in the newspaper.</p></section>
       <section class="panel"><div class="panel-head"><h3>Sales & promotions</h3>${pct ? `<span class="pill bad">${pct}% off · ${saleWhen(shop)}</span>` : ''}</div>
         ${pct ? `<p class="muted">Everything is ${pct}% off on Main Street ${saleWhen(shop)}.</p><div><button class="btn ghost sm" data-act="endSale" data-id="${sid}">End the sale</button></div>`
         : `<p class="muted">Run a sale to bring in customers. Everything on your ${T.list.toLowerCase()} gets cheaper and Main Street shows it off.</p>
@@ -1027,6 +1159,7 @@ function manageBiz(shop) {
 // ---------- banker views ----------
 function bankView() {
   if (S.tab === 'messages') return messagesView();
+  if (S.tab === 'paper') return paperView();
   if (S.tab === 'jobs') return bankJobsView();
   if (S.tab === 'inspector') return inspectorView();
   const b = balances(), ps = playerList();
@@ -1198,11 +1331,15 @@ function bankView() {
         <label>Early CD penalty (%)<input id="st-cdp" inputmode="decimal" value="${cfg('cdPenalty')}"></label></div></section>
       <section class="panel"><h3>Lottery, stocks & odd jobs</h3><div class="fields">
         <label>Stock market swings<select id="st-swing">${[[3, 'Calm (about 3% a day)'], [8, 'Normal (about 8% a day)'], [15, 'Wild (about 15% a day)'], [0, 'Off (sales only)']].map(([v, l]) => `<option value="${v}" ${Math.round(cfg('stockSwing')) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-        <label>Ticket price<input id="st-lp" inputmode="decimal" value="${c2(cfg('lotteryPrice'))}"></label>
+        <label>Pick 3 ticket price<input id="st-lp" inputmode="decimal" value="${c2(cfg('pick3Price'))}"></label>
         <label>Drawing every (days)<input id="st-le" type="number" min="1" value="${every('lotteryEvery')}"></label>
-        <label>Numbers from 1 to<input id="st-lm" type="number" min="2" max="99" value="${every('lotteryMax')}"></label>
-        <label>Share of tickets into jackpot (%)<input id="st-ls" inputmode="decimal" value="${cfg('lotteryShare')}"></label>
-        <label>Starting jackpot<input id="st-lseed" inputmode="decimal" value="${c2(cfg('lotterySeed'))}"></label>
+        <label>Numbers from 1 to<input id="st-lm" type="number" min="4" max="40" value="${Math.max(4, every('pick3Max'))}"></label>
+        <label>Share of tickets into jackpot (%)<input id="st-ls" inputmode="decimal" value="${cfg('pick3Share')}"></label>
+        <label>Starting jackpot<input id="st-lseed" inputmode="decimal" value="${c2(cfg('pick3Seed'))}"></label>
+        <label>Jackpot boost when nobody wins<input id="st-lboost" inputmode="decimal" value="${c2(cfg('pick3Boost'))}"></label>
+        <label>Prize for matching 2<input id="st-lm2" inputmode="decimal" value="${c2(cfg('pick3Match2'))}"></label>
+        <label>Prize for matching 1<input id="st-lm1" inputmode="decimal" value="${c2(cfg('pick3Match1'))}"></label>
+        <label>Scratch-off price<input id="st-scr" inputmode="decimal" value="${c2(cfg('scratchPrice'))}"></label>
         <label>New town jobs each day<input id="st-gigs" type="number" min="0" max="16" value="${Math.round(cfg('gigsPerDay'))}"></label></div></section>
       <section class="panel"><h3>Business rules</h3>
         ${Object.keys(BIZ).map(t => `<div class="fields"><label>${BIZ[t].Noun}: cost to open<input id="bc-${t}" inputmode="decimal" value="${(bizCost(t) / 100).toFixed(2)}"></label><label>Inspect every (days)<input id="br-i-${t}" type="number" min="1" value="${bizRule(t, 'inspect')}"></label><label>License lasts (days)<input id="br-l-${t}" type="number" min="1" value="${bizRule(t, 'license')}"></label></div>`).join('')}
@@ -1309,8 +1446,41 @@ const acts = {
     toast('Renewal denied');
   }),
   inspectOpen: id => { S.inspecting = S.inspecting === id ? null : id; render(); },
+  pickNum: n => { n = Number(n); const p = S.picks || []; S.picks = p.includes(n) ? p.filter(x => x !== n) : p.length >= 3 ? p : [...p, n].sort((a, b) => a - b); render(); },
+  quickPick: () => { const max = Math.max(4, every('pick3Max')); S.picks = Array.from({length: max}, (_, i) => i + 1).sort(() => Math.random() - .5).slice(0, 3).sort((a, b) => a - b); render(); },
+  buyLotto: () => run(async () => {
+    const nums = (S.picks || []).slice(); if (nums.length !== 3) fail('Pick 3 numbers first.');
+    const price = cfg('pick3Price'); if (bal(balances(), S.me, 'c') < price) fail(`A ticket costs ${money(price)}. Not enough in checking.`);
+    const drawNo = lotto().drawNo;
+    await addTx(S.me + '.c', 'bank', price, 'lottery', `Pick 3 ticket ${nums.join('-')}, drawing #${drawNo}`);
+    await db.collection('lottery').add({playerId: S.me, drawNo, numbers: nums, price, day: today(), at: Date.now()});
+    S.picks = []; toast(`Ticket ${nums.join(' · ')} bought. Good luck!`);
+  }),
+  buyScratch: () => run(async () => {
+    const price = cfg('scratchPrice'); if (bal(balances(), S.me, 'c') < price) fail(`A scratch-off costs ${money(price)}. Not enough in checking.`);
+    const o = scratchDraw();
+    await addTx(S.me + '.c', 'bank', price, 'lottery', 'Scratch-off ticket');
+    await db.collection('lottery').add({kind: 'scratch', playerId: S.me, symbols: o.symbols, prize: o.prize, revealed: [false, false, false], done: false, day: today(), at: Date.now()});
+    toast('Scratch it to see if you won!');
+  }),
+  scratch: key => run(async () => {
+    const [id, i] = key.split(':'), t = S.lottoTickets.find(x => x.id === id); if (!t || t.done) return;
+    const revealed = (t.revealed || [false, false, false]).slice(); revealed[Number(i)] = true;
+    if (revealed.every(Boolean)) {
+      if (t.prize > 0) await addTx('bank', S.me + '.c', t.prize, 'lottery', `Scratch-off winner: ${t.symbols.join('')}`);
+      await db.doc('lottery/' + id).update({revealed, done: true});
+      toast(t.prize > 0 ? `WINNER! ${t.symbols.join(' ')} pays ${money(t.prize)}!` : 'No match this time.');
+    } else await db.doc('lottery/' + id).update({revealed});
+  }),
+  lottoReveal: () => {
+    const last = (S.settings.lotteryHistory || [])[0]; if (!last) return;
+    S.reveal = {drawNo: last.drawNo, shown: 0}; render();
+    [1, 2, 3].forEach(k => setTimeout(() => { if (S.reveal && S.reveal.drawNo === last.drawNo) { S.reveal.shown = k; if (k === 3) ls('ptb.lotto.seen.' + S.me, String(last.drawNo)); render(); } }, k * 900));
+  },
+  paperDay: d => { S.paperDay = Math.min(today(), Math.max(1, parseInt(d, 10) || today())); window.scrollTo(0, 0); render(); },
+  dropStory: id => confirmIt('Remove this story?', 'It comes out of the Gazette for everyone.', 'Remove', async () => { await db.doc('messages/' + id).delete(); toast('Story removed'); }, true),
   finePreset: i => { const f = FINES[i]; if (!f) return; const w = document.getElementById('fn-why'), a = document.getElementById('fn-amt'); if (w) w.value = f[0]; if (a) a.value = (f[1] / 100).toFixed(2); },
-  tab: id => { S.tab = id; window.scrollTo(0, 0); render(); },
+  tab: id => { S.tab = id; S.paperDay = null; window.scrollTo(0, 0); render(); },
   modalNo: () => { S.modal = null; render(); },
   modalYes: () => { const f = S.modal?.fn; S.modal = null; render(); if (f) run(f); },
   advance: () => {
@@ -1517,12 +1687,25 @@ const forms = {
     const sh = S.shops[id]; if (!sh) fail('That business closed.');
     const checks = CHECKS.map((_, i) => !!document.getElementById(`ic-${id}-${i}`)?.checked), passed = checks.filter(Boolean).length;
     const pick = val('ig-' + id), grade = pick && pick !== 'auto' ? pick : ['F', 'F', 'D', 'C', 'B', 'A'][passed];
-    const notes = val('in-' + id).trim(), t = bizType(sh), nextDue = today() + (grade === 'F' ? 2 : bizRule(t, 'inspect'));
-    await db.doc('shops/' + id).update({inspection: {grade, day: today(), nextDue, notes, checks}, suspended: grade === 'F'});
+    const failed = FAIL_GRADES.includes(grade), wasClosed = !!sh.suspended;
+    const notes = val('in-' + id).trim(), t = bizType(sh), nextDue = today() + (failed ? 2 : bizRule(t, 'inspect'));
+    await db.doc('shops/' + id).update({inspection: {grade, day: today(), nextDue, notes, checks}, suspended: failed});
+    if (failed || wasClosed) {
+      const item = failed
+        ? {day: today(), title: `${sh.name} shut down`, text: `${sh.name}, owned by ${nameOf(sh.ownerId)}, failed its inspection with a ${grade} and is closed. It can’t reopen until it earns a C or better on re-inspection.`}
+        : {day: today(), title: `${sh.name} reopens`, text: `${sh.name} passed its re-inspection with a ${grade} and is open for business again.`};
+      await db.doc('town/settings').update({news: [item, ...(S.settings.news || [])].slice(0, 12)});
+    }
     const missed = CHECKS.filter((_, i) => !checks[i]);
-    await sendMsg('bank', sh.ownerId, `Inspection at ${sh.name}: Grade ${grade}.${missed.length ? ' Needs work: ' + missed.join(', ').toLowerCase() + '.' : ' Perfect score!'}${notes ? ' Notes: ' + notes : ''}${grade === 'F' ? ' The business is closed until a re-inspection on Day ' + nextDue + '.' : ' Next inspection by Day ' + nextDue + '.'}`);
+    await sendMsg('bank', sh.ownerId, `Inspection at ${sh.name}: Grade ${grade}.${missed.length ? ' Needs work: ' + missed.join(', ').toLowerCase() + '.' : ' Perfect score!'}${notes ? ' Notes: ' + notes : ''}${failed ? ' The business is shut down until it earns a C or better. Re-inspection on Day ' + nextDue + '. This made the news.' : (wasClosed ? ' You passed, so you’re open again! Next inspection by Day ' + nextDue + '.' : ' Next inspection by Day ' + nextDue + '.')}`);
     S.inspecting = null; clear('in-' + id, 'ig-' + id, ...CHECKS.map((_, i) => `ic-${id}-${i}`));
-    toast(`${sh.name} got a${grade === 'A' || grade === 'F' ? 'n' : ''} ${grade}${grade === 'F' ? ' and is closed' : ''}`);
+    toast(`${sh.name} got a${grade === 'A' || grade === 'F' ? 'n' : ''} ${grade}${failed ? ', is shut down, and made the news' : wasClosed ? ' and is open again' : ''}`);
+  },
+  story: async () => {
+    const h = val('ps-h').trim(), t = val('ps-t').trim();
+    if (!h || !t) fail('Add a headline and a story.');
+    await db.collection('messages').add({from: S.me, to: 'paper', headline: h.slice(0, 60), text: t.slice(0, 400), day: today(), at: Date.now()});
+    clear('ps-h', 'ps-t'); toast('Published in today’s Gazette!');
   },
   customBill: async () => {
     const who = val('cb-who'), why = val('cb-why').trim(), amt = toCents(val('cb-amt')), days = Math.max(0, parseInt(val('cb-days'), 10) || 0);
@@ -1564,15 +1747,6 @@ const forms = {
     if (post && changes.length) await db.collection('messages').add({from: 'bank', to: 'board', text, day: today(), at: Date.now()});
     clear('rt-sav', 'rt-loan', 'rt-mort', 'rt-cd', 'rt-apply', 'rt-post');
     toast(changes.length ? 'Rates updated' + (post ? ' and announced' : '') : `Updated ${active.length} active loan${active.length > 1 ? 's' : ''}`);
-  },
-  lotto: async () => {
-    const max = every('lotteryMax'), raw = val('lt-num'), n = raw === 'q' ? 1 + Math.floor(Math.random() * max) : parseInt(raw, 10);
-    if (!(n >= 1 && n <= max)) fail('Pick a number.');
-    const price = cfg('lotteryPrice'); if (bal(balances(), S.me, 'c') < price) fail(`A ticket costs ${money(price)}. Not enough in checking.`);
-    const drawNo = lotto().drawNo;
-    await addTx(S.me + '.c', 'bank', price, 'lottery', `Lottery ticket: number ${n}, drawing #${drawNo}`);
-    await db.collection('lottery').add({playerId: S.me, drawNo, number: n, price, day: today(), at: Date.now()});
-    toast(`Ticket bought: number ${n}. Good luck!`);
   },
   gigAnswer: async id => {
     const g = S.gigs.find(x => x.id === id); if (!g || g.status !== 'claimed' || g.claimedBy !== S.me) fail('That job isn’t yours anymore.');
@@ -1718,9 +1892,9 @@ const forms = {
       payEvery: ints('st-payev', 1), billEvery: ints('st-billev', 1), rentEvery: ints('st-rentev', 1), billGrace: ints('st-grace', 0), interestEvery: ints('st-intev', 1),
       taxRate: n('st-tax'), savingsRate: n('st-sav'), loanRate: n('st-loan'), lateFee: c('st-late'), cdRate: n('st-cdr'), cdDays: ints('st-cdd', 1), cdPenalty: Math.min(100, n('st-cdp')),
       mortgageRate: n('st-mr'), mortgageTerm: ints('st-mt', 1), downPct: Math.min(100, n('st-dp')), utilities, homes: homesList,
-      lotteryPrice: c('st-lp'), lotteryEvery: ints('st-le', 1), lotteryMax: Math.min(99, ints('st-lm', 2)), lotteryShare: Math.min(100, n('st-ls')), lotterySeed: c('st-lseed'), gigsPerDay: Math.min(16, ints('st-gigs', 0)), bizCosts: Object.fromEntries(Object.keys(BIZ).map(t => [t, c('bc-' + t)])), bizRules: Object.fromEntries(Object.keys(BIZ).map(t => [t, {inspect: ints('br-i-' + t, 1), license: ints('br-l-' + t, 1)}])), renewPct: Math.min(200, n('st-renew')), stockSwing: Math.min(50, n('st-swing')),
+      pick3Price: c('st-lp'), lotteryEvery: ints('st-le', 1), pick3Max: Math.min(40, ints('st-lm', 4)), pick3Share: Math.min(100, n('st-ls')), pick3Seed: c('st-lseed'), pick3Boost: c('st-lboost'), pick3Match2: c('st-lm2'), pick3Match1: c('st-lm1'), scratchPrice: c('st-scr'), gigsPerDay: Math.min(16, ints('st-gigs', 0)), bizCosts: Object.fromEntries(Object.keys(BIZ).map(t => [t, c('bc-' + t)])), bizRules: Object.fromEntries(Object.keys(BIZ).map(t => [t, {inspect: ints('br-i-' + t, 1), license: ints('br-l-' + t, 1)}])), renewPct: Math.min(200, n('st-renew')), stockSwing: Math.min(50, n('st-swing')),
     });
-    const all = ['st-name','st-sym','st-pin','st-day','st-ev','st-surp','st-payev','st-billev','st-rentev','st-grace','st-intev','st-tax','st-sav','st-loan','st-late','st-cdr','st-cdd','st-cdp','st-mr','st-mt','st-dp','st-lp','st-le','st-lm','st-ls','st-lseed','st-gigs','st-swing'];
+    const all = ['st-name','st-sym','st-pin','st-day','st-ev','st-surp','st-payev','st-billev','st-rentev','st-grace','st-intev','st-tax','st-sav','st-loan','st-late','st-cdr','st-cdd','st-cdp','st-mr','st-mt','st-dp','st-lp','st-le','st-lm','st-ls','st-lseed','st-lboost','st-lm2','st-lm1','st-scr','st-gigs','st-swing'];
     Object.keys(BIZ).forEach(t => all.push('bc-' + t, 'br-i-' + t, 'br-l-' + t)); all.push('st-renew');
     for (let i = 0; i < 4; i++) all.push('ut-n-' + i, 'ut-a-' + i, 'hm-n-' + i, 'hm-r-' + i, 'hm-p-' + i);
     clear(...all); toast('Settings saved');
