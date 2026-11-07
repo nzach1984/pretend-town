@@ -230,19 +230,19 @@ const COLORS = ['#2F7D6B','#C0612B','#5B5BB5','#B0457A','#3C7FB0','#8A6D1F','#6C
 const DEFAULTS = {day: 1, payEvery: 3, billEvery: 4, billGrace: 2, interestEvery: 7, lateFee: 200, taxRate: 10, savingsRate: 2, loanRate: 5,
   rentEvery: 7, mortgageRate: 2, mortgageTerm: 10, downPct: 20, cdRate: 8, cdDays: 7, cdPenalty: 10, eventChance: 35,
   lotteryPrice: 100, lotteryEvery: 3, lotteryMax: 20, lotteryShare: 50, lotterySeed: 1000, gigsPerDay: 3, stockSwing: 8, surpriseChance: 0, renewPct: 50,
-  pick3Price: 200, pick3Max: 12, pick3Share: 40, pick3Seed: 5000, pick3Match2: 400, pick3Match1: 100, pick3Boost: 1000, scratchPrice: 100, auditChance: 15, auditFine: 300, auditDays: 1, scratchLimit: 5, marketChance: 10, bizLimit: 2, auditPass: 3};
+  pick3Price: 200, pick3Max: 12, pick3Share: 40, pick3Seed: 5000, pick3Match2: 400, pick3Match1: 100, pick3Boost: 1000, scratchPrice: 100, auditChance: 15, auditFine: 300, auditDays: 1, scratchLimit: 5, marketChance: 10, bizLimit: 2, auditPass: 3, wholesalePct: 50, homeGrace: 1, profitShare: 20, dividendEvery: 7, needsCount: 3, needsBonus: 300, needsPenalty: 100, stampReward: 200, farmDiscount: 20, autoMinutes: 15};
 const DEFAULT_UTIL = [{name: 'Electric', amount: 800}, {name: 'Water', amount: 500}, {name: 'Internet', amount: 600}];
 const DEFAULT_HOMES = [{name: 'Apartment', rent: 1000, price: 15000}, {name: 'Townhouse', rent: 1600, price: 25000}, {name: 'House with a yard', rent: 2400, price: 40000}];
 const SHARES = 20;
 const BIZ = {
-  shop: {noun: 'shop', Noun: 'Shop', list: 'Price list', item: 'Item', buy: 'Buy', done: 'Delivered', waiting: 'Waiting for delivery', ph: 'Lemonade Stand', php: 'Fresh lemonade and cookies', iph: 'Cookie', tips: false, awning: 'var(--note)', always: 'Always in stock', stockLbl: 'Stock', blurb: 'Sell things to the rest of town'},
-  restaurant: {noun: 'restaurant', Noun: 'Restaurant', list: 'Menu', item: 'Dish', buy: 'Order', done: 'Served', waiting: 'Waiting to be served', ph: 'The Hungry Moose Diner', php: 'Pancakes, burgers and milkshakes', iph: 'Cheeseburger', tips: true, awning: 'var(--bad)', always: 'On the menu', stockLbl: 'Servings', blurb: 'Cook and serve meals; customers can tip'},
+  shop: {noun: 'shop', Noun: 'Shop', list: 'Price list', item: 'Item', buy: 'Buy', done: 'Delivered', waiting: 'Waiting for delivery', ph: 'Lemonade Stand', php: 'Fresh lemonade and cookies', iph: 'Cookie', restock: true, tips: false, awning: 'var(--note)', always: 'Always in stock', stockLbl: 'Stock', blurb: 'Sell things to the rest of town'},
+  restaurant: {noun: 'restaurant', Noun: 'Restaurant', list: 'Menu', item: 'Dish', buy: 'Order', done: 'Served', waiting: 'Waiting to be served', ph: 'The Hungry Moose Diner', php: 'Pancakes, burgers and milkshakes', iph: 'Cheeseburger', restock: true, tips: true, awning: 'var(--bad)', always: 'On the menu', stockLbl: 'Servings', blurb: 'Cook and serve meals; customers can tip'},
   service: {noun: 'service business', Noun: 'Service', list: 'Services', item: 'Service', buy: 'Book', done: 'Completed', waiting: 'Booked, waiting for service', ph: 'Sparkle Car Wash', php: 'Car washes, haircuts, tutoring', iph: 'Full car wash', tips: true, awning: '#3C7FB0', always: 'Open for booking', stockLbl: 'Time slots', blurb: 'Do jobs for people like haircuts or car washes; customers can tip'},
   entertainment: {noun: 'entertainment venue', Noun: 'Entertainment', list: 'Tickets', item: 'Ticket', buy: 'Get tickets', done: 'Admitted', waiting: 'Tickets ready to use', ph: 'Starlight Movie Theater', php: 'Movies, an arcade, or a mini zoo', iph: 'Movie ticket', tips: false, awning: '#9C4BB3', always: 'Plenty of seats', stockLbl: 'Seats', blurb: 'Sell tickets to movies, shows, games or rides'},
   doctor: {noun: 'doctor’s office', Noun: 'Doctor’s office', list: 'Treatments', item: 'Treatment', buy: 'Book visit', done: 'Treated', waiting: 'Waiting to see the doctor', ph: 'Main Street Clinic', php: 'Checkups, bandages and flu shots', iph: 'Checkup', tips: false, awning: '#C0612B', always: 'Open for visits', stockLbl: 'Appointments', blurb: 'Treat patients; residents’ doctor bills get paid to you'},
   repair: {noun: 'repair shop', Noun: 'Repair shop', list: 'Repairs', item: 'Repair', buy: 'Book repair', done: 'Fixed', waiting: 'Waiting for the repair', ph: 'Fix-It Garage', php: 'Bikes, cars, phones and windows', iph: 'Fix a flat tire', tips: true, awning: '#8A6D1F', always: 'Taking jobs', stockLbl: 'Time slots', blurb: 'Fix things; residents’ repair bills get paid to you'},
   hotel: {noun: 'hotel', Noun: 'Hotel', list: 'Rooms', item: 'Room type', buy: 'Book', done: 'Checked in', waiting: 'Room booked', ph: 'Grand Pine Hotel', php: 'Cozy rooms, a pool and free breakfast', iph: 'Standard room', tips: false, awning: '#2F7D6B', always: '', stockLbl: 'Number of rooms', blurb: 'Rent rooms by the night; tourists fill some rooms', hotel: true, bankOnly: true},
-  farm: {noun: 'farm stand', Noun: 'Farm stand', list: 'Produce', item: 'Produce', buy: 'Buy', done: 'Picked up', waiting: 'Ready for pickup', ph: 'Sunny Acres Farm', php: 'Fresh eggs, apples and flowers', iph: 'Dozen eggs', tips: false, awning: '#6C8A2E', always: 'Plenty in the field', stockLbl: 'Amount', blurb: 'Grow and sell fresh food and flowers'},
+  farm: {noun: 'farm stand', Noun: 'Farm stand', list: 'Produce', item: 'Produce', buy: 'Buy', done: 'Picked up', waiting: 'Ready for pickup', ph: 'Sunny Acres Farm', php: 'Fresh eggs, apples and flowers', iph: 'Dozen eggs', restock: true, tips: false, awning: '#6C8A2E', always: 'Plenty in the field', stockLbl: 'Amount', blurb: 'Grow and sell fresh food and flowers'},
 };
 const EVENTS = [
   {t: 'Town Fair', x: 'Everyone wins a {a} prize at the fair.', e: 'bonusAll', a: 500},
@@ -354,6 +354,32 @@ function inspNotice(sh) {
 }
 const bizLimit = () => Math.max(1, Math.round(cfg('bizLimit')));
 const bizCount = pid => Object.values(S.shops).filter(sh => sh.ownerId === pid).length;
+const needsStock = sh => !!BIZ[bizType(sh)]?.restock;
+const unitCost = item => Math.max(25, Math.round((item.price || 0) * cfg('wholesalePct') / 100));
+const supplySpend = shopId => S.tx.filter(t => t.kind === 'supply' && t.shopId === shopId).reduce((a, t) => a + t.amount, 0);
+const lowStock = sh => needsStock(sh) ? Object.values(S.items).filter(i => i.shopId === sh.id && i.stock != null && i.stock <= 2) : [];
+async function doStockStart(day) {
+  let n = 0;
+  for (const it of Object.values(S.items).filter(i => i.stock == null && needsStock(S.shops[i.shopId]))) { await db.doc('items/' + it.id).update({stock: 10}); n++; }
+  return n ? `starter stock for ${n} item${n > 1 ? 's' : ''}` : '';
+}
+// Everyone has to live somewhere. Without a home, the town places you in the cheapest rental after a grace period.
+const homeDeadline = p => (p.homelessSince ?? today()) + Math.max(0, Math.round(cfg('homeGrace')));
+const cheapestRental = () => homes().filter(h => h.rent > 0).sort((a, b) => a.rent - b.rent)[0];
+async function doHomeRule(day) {
+  let placed = 0;
+  for (const p of playerList().filter(p => !p.home)) {
+    if (p.homelessSince == null) { await db.doc('players/' + p.id).update({homelessSince: day - 1}); continue; }
+    if (day > homeDeadline(p)) {
+      const h = cheapestRental(); if (!h) continue;
+      await addTx(p.id + '.c', 'bank', h.rent, 'rent', `First rent · ${h.name} (placed by the town)`, {day});
+      await db.doc('players/' + p.id).update({home: {name: h.name, mode: 'rent', rent: h.rent, price: h.price}, homelessSince: null});
+      await sendMsg('bank', p.id, `You didn’t choose a home in time, so the town moved you into the ${h.name}. The first rent of ${money(h.rent)} came out of your checking. You can move somewhere else anytime on the Housing tab.`, day);
+      placed++;
+    }
+  }
+  return placed ? `${placed} resident${placed > 1 ? 's' : ''} placed in housing` : '';
+}
 const owesOf = pid => loansOf(pid).filter(l => l.status === 'active').reduce((a, l) => a + l.balance, 0) + openBills(pid).reduce((a, b) => a + b.total, 0) + Math.max(0, -bal(balances(), pid, 'c'));
 const bizValue = sh => sh.startCost ?? bizCost(bizType(sh));
 const acctOf = pid => pid === 'bank' ? 'bank' : pid + '.c';
@@ -505,7 +531,8 @@ const saleWhen = shop => shop.sale.untilDay === today() ? 'today only' : 'throug
 function revenue(shopId, endDay) {
   const inWin = d => (d || 1) > endDay - 7 && (d || 1) <= endDay;
   return S.orders.filter(o => o.shopId === shopId && o.status !== 'refunded' && inWin(o.day)).reduce((s, o) => s + o.total, 0)
-    + S.tx.filter(t => t.kind === 'hotel' && t.shopId === shopId && inWin(t.day)).reduce((s, t) => s + t.amount, 0);
+    + S.tx.filter(t => t.kind === 'hotel' && t.shopId === shopId && inWin(t.day)).reduce((s, t) => s + t.amount, 0)
+    + S.tx.filter(t => t.kind === 'supply' && t.supplierShopId === shopId && inWin(t.day)).reduce((s, t) => s + t.amount, 0);
 }
 // Repeatable noise in [-1, 1]: the same shop and day give the same number on every device.
 function noise(key) {
@@ -552,6 +579,57 @@ function sharePrice(shopId, day = today()) {
   if (ev && ev.effect === 'market' && day >= ev.day && day <= (ev.untilDay ?? ev.day)) p = Math.round(p * (100 + ev.value) / 100);
   return Math.max(100, p);
 }
+// Profit sharing: every few days the town's investment fund pays shareholders a slice of each business's profit.
+function profitBetween(shopId, fromDay, toDay) {
+  const win = d => (d || 1) > fromDay && (d || 1) <= toDay;
+  const sales = S.orders.filter(o => o.shopId === shopId && o.status !== 'refunded' && win(o.day)).reduce((a, o) => a + o.total, 0)
+    + S.tx.filter(t => t.kind === 'hotel' && t.shopId === shopId && win(t.day)).reduce((a, t) => a + t.amount, 0)
+    + S.tx.filter(t => t.kind === 'supply' && t.supplierShopId === shopId && win(t.day)).reduce((a, t) => a + t.amount, 0);
+  const costs = S.tx.filter(t => t.kind === 'supply' && t.shopId === shopId && win(t.day)).reduce((a, t) => a + t.amount, 0);
+  return sales - costs;
+}
+const perSharePreview = shopId => { const n = every('dividendEvery'), p = profitBetween(shopId, today() - n, today()); return p > 0 ? p * cfg('profitShare') / 100 / SHARES : 0; };
+const dividendsOf = pid => S.tx.filter(t => t.kind === 'dividend' && t.to === pid + '.c').reduce((a, t) => a + t.amount, 0);
+async function doDividends(day) {
+  const n = every('dividendEvery'), pct = cfg('profitShare'); if (pct <= 0) return '';
+  let paid = 0; const news = [];
+  for (const sh of Object.values(S.shops)) {
+    const profit = profitBetween(sh.id, day - 1 - n, day - 1), holders = S.holdings.filter(h => h.shopId === sh.id && h.shares > 0);
+    if (profit <= 0 || !holders.length) { if (holders.length) await db.doc('shops/' + sh.id).update({lastDividend: {day, perShare: 0, profit}}); continue; }
+    const perShare = profit * pct / 100 / SHARES; let total = 0;
+    for (const h of holders) { const amt = Math.round(perShare * h.shares); if (amt <= 0) continue; await addTx('bank', h.playerId + '.c', amt, 'dividend', `Profit sharing: ${sh.name} (${h.shares} share${h.shares > 1 ? 's' : ''})`, {shopId: sh.id, day}); total += amt; paid++; }
+    await db.doc('shops/' + sh.id).update({lastDividend: {day, perShare: Math.round(perShare), profit}});
+    if (total) news.push(`${sh.name} shared ${money(total)}`);
+  }
+  if (news.length) { const item = {day, title: 'Profit sharing day', text: `Shareholders got their cut: ${news.join(', ')}.`}; await db.doc('town/settings').update({news: [item, ...(S.settings.news || [])].slice(0, 12)}); }
+  return paid ? `profit sharing paid to ${paid} shareholder${paid > 1 ? 's' : ''}` : '';
+}
+// Daily needs: each resident needs a few things a day from other residents' businesses.
+const NEED_CATS = {meal: {label: 'Eat a meal', where: 'a restaurant', types: ['restaurant']}, groceries: {label: 'Buy groceries', where: 'a shop or farm stand', types: ['shop', 'farm']}, fun: {label: 'Have some fun', where: 'an entertainment spot', types: ['entertainment']}, service: {label: 'Get a service', where: 'a service, repair shop or doctor', types: ['service', 'repair', 'doctor']}};
+function needsFor(pid, day) {
+  if (S.settings?.needsSince == null || day < S.settings.needsSince) return [];
+  const avail = Object.keys(NEED_CATS).filter(k => Object.values(S.shops).some(sh => NEED_CATS[k].types.includes(bizType(sh)) && sh.ownerId !== pid && isOpenBiz(sh)));
+  return avail.sort((a, b) => noise('nd|' + pid + '|' + day + a) - noise('nd|' + pid + '|' + day + b)).slice(0, Math.max(0, Math.round(cfg('needsCount'))));
+}
+const needMet = (pid, day, k) => S.orders.some(o => o.buyerId === pid && o.day === day && o.status !== 'refunded' && NEED_CATS[k].types.includes(BIZ[o.bizType] ? o.bizType : 'shop') && S.shops[o.shopId]?.ownerId !== pid);
+async function doNeeds(day) {
+  if (S.settings.needsSince == null) { await db.doc('town/settings').update({needsSince: day}); return ''; }
+  const dd = day - 1; if (dd < S.settings.needsSince) return '';
+  let full = 0, missedAll = 0;
+  for (const p of playerList()) {
+    const needs = needsFor(p.id, dd); if (!needs.length) continue;
+    const met = needs.filter(k => needMet(p.id, dd, k)), missed = needs.filter(k => !met.includes(k));
+    if (!missed.length && cfg('needsBonus') > 0) { await addTx('bank', p.id + '.c', cfg('needsBonus'), 'needs', `Bonus: met all your needs on Day ${dd}`, {day}); full++; }
+    if (missed.length && cfg('needsPenalty') > 0) { await addTx(p.id + '.c', 'bank', missed.length * cfg('needsPenalty'), 'needs', `Missed needs on Day ${dd}: ${missed.map(k => NEED_CATS[k].label.toLowerCase()).join(', ')}`, {day}); missedAll++; }
+  }
+  return full || missedAll ? `daily needs settled` : '';
+}
+// Shop-local stamps: every purchase of $1+ from another resident's business earns a stamp.
+const STAMPS_PER = 5;
+const stampsOf = pid => S.orders.filter(o => o.buyerId === pid && o.status !== 'refunded' && o.sellerId !== 'bank' && o.sellerId !== pid && (o.total || 0) >= 100).length;
+// Request board escrow helpers
+const myRequests = pid => S.gigs.filter(g => g.kind === 'request' && g.postedBy === pid && !['paid', 'cancelled'].includes(g.status)).sort((a, b) => b.at - a.at);
+const reviewerOf = g => g.kind === 'request' ? nameOf(g.postedBy) : 'the banker';
 const sharesOut = shopId => S.holdings.filter(h => h.shopId === shopId).reduce((s, h) => s + (h.shares || 0), 0);
 const holdingsOf = pid => S.holdings.filter(h => h.playerId === pid && h.shares > 0);
 function spark(shopId) {
@@ -603,7 +681,7 @@ function gauge(score, cls) {
     <text x="108" y="67" font-size="7" fill="var(--muted)" text-anchor="middle">850</text></svg>`;
 }
 
-const KIND = {pay:'Paycheck', check:'Check', move:'Savings transfer', purchase:'Purchase', meal:'Restaurant', refund:'Refund', loan:'Loan', repay:'Loan payment', interest:'Interest', adjust:'From the bank', bill:'Bill', lottery:'Lottery', job:'Odd job', biz:'Business', hotel:'Hotel', reverse:'Reversal', rent:'Rent', home:'Home', stock:'Stocks', cash:'Cash', cd:'CD', event:'Town event'};
+const KIND = {pay:'Paycheck', check:'Check', move:'Savings transfer', purchase:'Purchase', meal:'Restaurant', refund:'Refund', loan:'Loan', repay:'Loan payment', interest:'Interest', adjust:'From the bank', bill:'Bill', lottery:'Lottery', job:'Odd job', biz:'Business', hotel:'Hotel', reverse:'Reversal', supply:'Supplies', dividend:'Profit share', needs:'Daily needs', stamps:'Stamp reward', escrow:'Request', rent:'Rent', home:'Home', stock:'Stocks', cash:'Cash', cd:'CD', event:'Town event'};
 function txRows(list, pid, limit = 15, canReverse = false) {
   const rows = list.slice(0, limit).map(t => {
     let delta = null; const title = t.memo || KIND[t.kind] || 'Transaction';
@@ -757,6 +835,30 @@ async function doLicenses(day) {
   }
   return n ? `${n} license${n > 1 ? 's' : ''} expired` : '';
 }
+async function advanceDay() {
+  const d = today() + 1, patch = {}, done = [];
+  { const r = await doNeeds(d); if (r) done.push(r); }
+  const late = await markLate(d); if (late) done.push(late);
+  const cd = await doCds(d); if (cd) done.push(cd);
+  { const r = await doLicenses(d); if (r) done.push(r); }
+  if (d % every('payEvery') === 0) { const r = await doPayday(patch); if (r) done.push(r); }
+  if (d % every('billEvery') === 0) { const r = await doUtilities(d); if (r) done.push(r); }
+  if (d % every('rentEvery') === 0) { const r = await doHousing(d); if (r) done.push(r); }
+  if (d % every('interestEvery') === 0) { const r = await doInterest(patch); if (r) done.push(r); }
+  if (d % every('lotteryEvery') === 0) { const r = await doLottery(d, patch); if (r) done.push(r); }
+  { const r = await doStockStart(d); if (r) done.push(r); }
+  { const r = await doHotels(d); if (r) done.push(r); }
+  if (d % every('dividendEvery') === 0) { const r = await doDividends(d); if (r) done.push(r); }
+  { const r = await doAudits(d); if (r) done.push(r); }
+  if (!marketActive(d) && Math.random() * 100 < cfg('marketChance')) done.push(await startMarket(Math.random() < .5 ? 'boom' : 'crash', d, patch));
+  { const r = await doGigs(d); if (r) done.push(r); }
+  if (playerList().length && Math.random() * 100 < cfg('surpriseChance')) { const g = await sendSurprise([pickRandom(playerList())], d); done.push('surprise bill for ' + g[0].split(':')[0]); }
+  if (Math.random() * 100 < cfg('eventChance')) { const r = await drawEvent(d, patch); if (r) done.push(r); }
+  patch.day = d;
+  if (S.settings.autoOn) patch.autoNextAt = Date.now() + Math.max(1, Math.round(cfg('autoMinutes'))) * 60000;
+  await db.doc('town/settings').update(patch);
+  toast(`Good morning, Day ${d}!` + (done.length ? ' ' + done.join(', ') + '.' : ''));
+}
 async function markLate(day) {
   const fee = Math.max(0, Math.round(cfg('lateFee'))); let n = 0;
   for (const b of S.bills.filter(b => b.status === 'due' && b.dueDay < day)) { await db.doc('bills/' + b.id).update({status: 'late', lateFee: fee, total: b.total + fee}); n++; }
@@ -849,14 +951,14 @@ function shell(isBank) {
   const bankQueue = waitingTeller().length + Object.values(S.loans).filter(l => l.status === 'requested').length;
   const myWaiting = tellerOf(S.me).filter(t => t.status === 'waiting').length + loansOf(S.me).filter(l => l.status === 'requested').length;
   const tabs = isBank
-    ? [['town','Town'],['paper','Gazette'],['calendar','Day & schedule'],['teller','Teller window', bankQueue],['jobs','Odd jobs', S.gigs.filter(g => g.status === 'review').length],['hotel','Bank businesses', S.orders.filter(o => o.sellerId === 'bank' && o.status === 'new').length],['inspector','Inspector', Object.values(S.shops).filter(sh => sh.ownerId !== 'bank').filter(sh => sh.renewalRequested || inspOverdue(sh) || sh.inspection?.nextDue === today()).length],['messages','Messages', unreadTotal()],['people','Residents'],['shops','Businesses'],['settings','Settings']]
-    : [['home','Accounts'],['paper','Gazette'],['messages','Messages', unreadTotal()],['bills','Bills', openBills(S.me).length],['jobs','Odd jobs', activeGigs(S.me).filter(g => g.status === 'claimed').length],['housing','Housing'],['pay','Write a check'],['shop','Main Street'],...(auditPending(S.me) ? [['audit','Tax audit', 1]] : auditOf(S.me)?.doneDay === today() ? [['audit','Tax audit']] : []),['myshop','My businesses', (bizCount(S.me) > bizLimit() ? 1 : 0) + myOrders + Object.values(S.shops).filter(sh => sh.ownerId === S.me && ['Today', 'Overdue'].includes(inspNotice(sh)?.short)).length],['stocks','Stocks'],['lottery','Lottery', ((() => { const l = (S.settings.lotteryHistory || [])[0]; return l && l.numbers && l.drawNo > Number(ls('ptb.lotto.seen.' + S.me) || 0) && S.lottoTickets.some(t => t.drawNo === l.drawNo && t.playerId === S.me) ? 1 : 0; })()) + S.lottoTickets.filter(t => t.kind === 'scratch' && t.playerId === S.me && !t.done).length],['bank','Bank & credit', myWaiting]];
+    ? [['town','Town'],['paper','Gazette'],['calendar','Day & schedule'],['teller','Teller window', bankQueue],['jobs','Odd jobs', S.gigs.filter(g => g.status === 'review' && g.kind !== 'request').length],['hotel','Bank businesses', S.orders.filter(o => o.sellerId === 'bank' && o.status === 'new').length],['inspector','Inspector', Object.values(S.shops).filter(sh => sh.ownerId !== 'bank').filter(sh => sh.renewalRequested || inspOverdue(sh) || sh.inspection?.nextDue === today()).length],['messages','Messages', unreadTotal()],['people','Residents'],['shops','Businesses'],['settings','Settings']]
+    : [['home','Accounts'],['paper','Gazette'],['messages','Messages', unreadTotal()],['bills','Bills', openBills(S.me).length],['jobs','Odd jobs', activeGigs(S.me).filter(g => g.status === 'claimed').length + S.gigs.filter(g => g.kind === 'request' && g.postedBy === S.me && g.status === 'review').length],['housing','Housing'],['pay','Write a check'],['shop','Main Street'],...(auditPending(S.me) ? [['audit','Tax audit', 1]] : auditOf(S.me)?.doneDay === today() ? [['audit','Tax audit']] : []),['myshop','My businesses', (bizCount(S.me) > bizLimit() ? 1 : 0) + Object.values(S.shops).filter(sh => sh.ownerId === S.me).reduce((a, sh) => a + lowStock(sh).filter(i => i.stock === 0).length, 0) + myOrders + Object.values(S.shops).filter(sh => sh.ownerId === S.me && ['Today', 'Overdue'].includes(inspNotice(sh)?.short)).length],['stocks','Stocks'],['lottery','Lottery', ((() => { const l = (S.settings.lotteryHistory || [])[0]; return l && l.numbers && l.drawNo > Number(ls('ptb.lotto.seen.' + S.me) || 0) && S.lottoTickets.some(t => t.drawNo === l.drawNo && t.playerId === S.me) ? 1 : 0; })()) + S.lottoTickets.filter(t => t.kind === 'scratch' && t.playerId === S.me && !t.done).length],['bank','Bank & credit', myWaiting]];
   if (!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
   const who = isBank ? 'Banker mode' : nameOf(S.me) + (S.players[S.me]?.job ? ' · ' + S.players[S.me].job : '');
   const content = isBank ? bankView() : playerView();
   return `<header class="top"><div class="top-in">
       <span class="seal">${initial(S.settings.name)}</span>
-      <div class="brand"><b>${esc(S.settings.name)} Bank</b><span><span class="daychip">Day ${today()}</span>${esc(who)}</span></div>
+      <div class="brand"><b>${esc(S.settings.name)} Bank</b><span><span class="daychip">Day ${today()}${S.settings.autoOn && S.settings.autoNextAt ? ' · next in ' + Math.max(0, Math.ceil((S.settings.autoNextAt - Date.now()) / 60000)) + 'm' : ''}</span>${esc(who)}</span></div>
       <button class="btn ghost sm" data-act="switch">Switch person</button></div>
     <nav class="tabs" aria-label="Sections">${tabs.map(([k, l, n]) => `<button class="tab" data-act="tab" data-id="${k}" ${S.tab === k ? 'aria-current="page"' : ''}>${l}${n ? `<span class="dot">${n}</span>` : ''}</button>`).join('')}</nav>
   </header><main>${content}</main>`;
@@ -891,13 +993,20 @@ function playerView() {
     ${auditPending(pid) ? `<div class="alert bad"><span><b>Surprise tax audit!</b> Answer ${AUDIT_N} problems by the end of ${auditOf(pid).dueDay === today() ? 'today' : 'Day ' + auditOf(pid).dueDay}.</span><button class="btn sm" data-act="tab" data-id="audit">Start audit</button></div>` : ''}
     ${Object.values(S.shops).filter(sh => sh.ownerId === pid && ['Today', 'Tomorrow', 'Overdue'].includes(inspNotice(sh)?.short)).map(sh => { const n = inspNotice(sh); return `<div class="alert ${n.cls === 'bad' ? 'bad' : ''}"><span><b>${esc(sh.name)}:</b> ${esc(n.text)}</span><button class="btn sm" data-act="tab" data-id="myshop">Open</button></div>`; }).join('')}
     ${bizCount(pid) > bizLimit() ? `<div class="alert bad"><span><b>Too many businesses.</b> The limit is ${bizLimit()}. Choose which to close.</span><button class="btn sm" data-act="tab" data-id="myshop">Choose</button></div>` : ''}
-    ${!p.home ? `<div class="alert"><span><b>You don’t have a place to live yet.</b> Rent or buy a home.</span><button class="btn sm" data-act="tab" data-id="housing">Find a home</button></div>` : ''}
+    ${!p.home ? `<div class="alert"><span><b>You don’t have a place to live yet.</b> Rent or buy a home when you’re ready.</span><button class="btn sm" data-act="tab" data-id="housing">Find a home</button></div>` : ''}
+    ${(() => { const needs = needsFor(pid, today()); if (!needs.length) return ''; const met = needs.filter(k => needMet(pid, today(), k)).length;
+      return `<section class="panel"><div class="panel-head"><h3>Today’s needs</h3><span class="pill ${met === needs.length ? 'good' : 'warn'}">${met} of ${needs.length}</span></div>
+        <div class="list">${needs.map(k => { const ok = needMet(pid, today(), k); return `<div class="li"><span class="badge" style="${ok ? 'color:var(--good)' : ''}">${ok ? '✓' : '○'}</span><div class="main"><b>${NEED_CATS[k].label}</b><small>Buy from ${NEED_CATS[k].where} run by someone else</small></div></div>`; }).join('')}</div>
+        <div class="row" style="justify-content:space-between"><span class="muted" style="font-size:.85rem">Meet them all for a ${money(cfg('needsBonus'))} bonus. Each one you miss costs ${money(cfg('needsPenalty'))} when the next day starts.</span><button class="btn sm" data-act="tab" data-id="shop">Go to Main Street</button></div></section>`; })()}
     <div class="accts">
       <div class="acct"><div class="k"><span>Checking</span><span class="num">•• ${acctNo(pid + 'c')}</span></div>
         <div class="v">${money(bal(b, pid, 'c'))}</div><div class="s">For spending, checks, bills and shopping</div></div>
       <div class="acct sav"><div class="k"><span>Savings</span><span class="num">•• ${acctNo(pid + 's')}</span></div>
         <div class="v">${money(bal(b, pid, 's'))}</div><div class="s">Earns ${cfg('savingsRate')}% every ${every('interestEvery')} days</div></div>
     </div>
+    ${(() => { const st = stampsOf(pid), filled = st % STAMPS_PER; return `<section class="panel"><div class="panel-head"><h3>Shop-local stamp card</h3><span class="muted" style="font-size:.85rem">${Number(p.stampsRedeemed || 0)} card${Number(p.stampsRedeemed || 0) === 1 ? '' : 's'} filled</span></div>
+      <div class="balls">${Array.from({length: STAMPS_PER}, (_, i) => `<span class="ball sm ${i < filled ? 'hit' : 'miss'}">${i < filled ? '★' : ''}</span>`).join('')}</div>
+      <p class="muted" style="font-size:.85rem">Get a stamp for every purchase of ${money(100)} or more from another resident’s business. Fill the card to get ${money(cfg('stampReward'))} back from the town.</p></section>`; })()}
     <div class="stats"><div class="stat"><b>${money(netWorth(pid, b))}</b><span>Net worth (everything you own minus what you owe)</span></div>
       <div class="stat"><b>${money(cdTotal)}</b><span>In CDs</span></div><div class="stat"><b>${money(stockVal)}</b><span>In stocks</span></div></div>
     <div class="cols"><div class="stack">
@@ -984,6 +1093,7 @@ function playerView() {
     return `<div class="cols"><div class="stack">
       <div><p class="eyebrow">Main Street · Day ${today()}</p><h2>Shops, restaurants & more</h2></div>
       ${newsBanner()}
+      ${(() => { const needs = needsFor(pid, today()); return needs.length ? `<div class="alert news"><span><b>Today’s needs:</b> ${needs.map(k => `${needMet(pid, today(), k) ? '✓' : '○'} ${NEED_CATS[k].label}`).join(' · ')}</span></div>` : ''; })()}
       ${onSale.length ? `<div class="alert sale"><span><b>Sales today:</b> ${onSale.map(s => `${esc(s.name)} ${salePct(s)}% off`).join(' · ')}</span></div>` : ''}
       ${bizs.length ? bizs.map(s => {
         const T = BIZ[bizType(s)], items = Object.values(S.items).filter(i => i.shopId === s.id), pct = salePct(s);
@@ -1028,19 +1138,20 @@ function playerView() {
     return `<div class="cols"><div class="stack">
       <div><p class="eyebrow">Town Stock Exchange · Day ${today()}</p><h2>The market</h2></div>
       ${marketNow() ? `<div class="alert ${marketNow().cls === 'bad' ? 'bad' : 'news'}"><span><b>${esc(marketNow().text)}</b></span></div>` : newsBanner()}
-      <section class="panel">${bizs.length ? `<div class="tbl-wrap"><table><thead><tr><th>Business</th><th class="r">Price</th><th class="r">Today</th><th>Last 7 days</th><th class="r">Shares left</th><th></th></tr></thead><tbody>
+      <section class="panel">${bizs.length ? `<div class="tbl-wrap"><table><thead><tr><th>Business</th><th class="r">Price</th><th class="r">Today</th><th>Last 7 days</th><th class="r">Shares left</th><th class="r">Profit share</th><th></th></tr></thead><tbody>
         ${bizs.map(s => { const pNow = sharePrice(s.id), pPrev = sharePrice(s.id, Math.max(1, today() - 1)), ch = pPrev ? (pNow - pPrev) / pPrev * 100 : 0, left = SHARES - sharesOut(s.id), own = s.ownerId === pid;
           return `<tr><td><b>${esc(s.name)}</b><br><small class="muted">${BIZ[bizType(s)].Noun} · ${esc(nameOf(s.ownerId))}</small></td><td class="r num">${money(pNow)}</td>
-          <td class="r num ${ch > 0 ? 'pos' : ch < 0 ? 'neg' : 'muted'}">${ch > 0 ? '▲' : ch < 0 ? '▼' : '–'} ${Math.abs(ch).toFixed(1)}%</td><td>${spark(s.id)}</td><td class="r">${left}</td>
+          <td class="r num ${ch > 0 ? 'pos' : ch < 0 ? 'neg' : 'muted'}">${ch > 0 ? '▲' : ch < 0 ? '▼' : '–'} ${Math.abs(ch).toFixed(1)}%</td><td>${spark(s.id)}</td><td class="r">${left}</td><td class="r"><small>${s.lastDividend ? (s.lastDividend.perShare ? money(s.lastDividend.perShare) + '/share' : 'none') + ' last time' : 'not yet'}<br><span class="muted">so far: ~${money(Math.round(perSharePreview(s.id)))}/share</span></small></td>
           <td class="r">${own ? '<small class="muted">Your business</small>' : left > 0 ? `<div class="row" style="justify-content:flex-end;flex-wrap:nowrap"><input id="sb-${s.id}" type="number" min="1" max="${left}" value="1" style="width:64px;min-height:38px;padding:6px" aria-label="Shares"><button class="btn sm" data-act="buyStock" data-id="${s.id}">Buy</button></div>` : '<small class="muted">Sold out</small>'}</td></tr>`; }).join('')}
         </tbody></table></div>` : '<div class="empty">No businesses to invest in yet.</div>'}</section>
     </div><div class="stack">
       <section class="panel"><h3>Your portfolio</h3>
-        <div class="stats"><div class="stat"><b>${money(value)}</b><span>Worth now</span></div><div class="stat"><b class="${value - cost >= 0 ? 'pos' : 'neg'}">${money(value - cost, true)}</b><span>Gain or loss</span></div></div>
+        <div class="stats"><div class="stat"><b>${money(value)}</b><span>Worth now</span></div><div class="stat"><b class="${value - cost >= 0 ? 'pos' : 'neg'}">${money(value - cost, true)}</b><span>Gain or loss</span></div><div class="stat"><b class="pos">${money(dividendsOf(pid))}</b><span>Profit sharing earned</span></div></div>
+        <p class="muted" style="font-size:.85rem">Next profit sharing: <b>${dayIn(nextOn('dividendEvery'))}</b>.</p>
         <div class="list">${mine.length ? mine.map(h => { const pr = sharePrice(h.shopId), v = h.shares * pr, g = v - (h.cost || 0);
           return `<div class="li"><div class="main"><b>${esc(S.shops[h.shopId]?.name || 'Closed business')}</b><small>${h.shares} share${h.shares > 1 ? 's' : ''} · paid ${money(h.cost)} · now ${money(v)} <span class="${g >= 0 ? 'pos' : 'neg'}">(${money(g, true)})</span></small></div>
             <input id="ss-${h.shopId}" type="number" min="1" max="${h.shares}" value="${h.shares}" style="width:64px;min-height:38px;padding:6px" aria-label="Shares to sell"><button class="btn ghost sm" data-act="sellStock" data-id="${h.shopId}">Sell</button></div>`; }).join('') : '<div class="empty">You don’t own any shares yet.</div>'}</div></section>
-      <section class="panel"><h3>How the market works</h3><p class="muted">Every business has ${SHARES} shares. A share starts around ${money(Math.round(10000 / SHARES))}. Over time the price follows how much the business sells over the last 7 days. Prices also bounce up and down a little every day for no clear reason, just like real stocks, and some days the whole market moves together. A good business can still have a bad day. Buy shares in businesses you believe in, and don’t panic over one bad day. Town news can move every price too.</p></section>
+      <section class="panel"><h3>How the market works</h3><p class="muted">Every business has ${SHARES} shares. A share starts around ${money(Math.round(10000 / SHARES))}. Over time the price follows how much the business sells over the last 7 days. Prices also bounce up and down a little every day for no clear reason, just like real stocks, and some days the whole market moves together. A good business can still have a bad day. Buy shares in businesses you believe in, and don’t panic over one bad day. Town news can move every price too.</p><p class="muted"><b>Profit sharing:</b> every ${every('dividendEvery')} days, shareholders get ${cfg('profitShare')}% of each business’s profit (sales minus what it spent on stock), split across its ${SHARES} shares. Own more shares in busy businesses, earn more.</p></section>
     </div></div>`;
   }
   if (S.tab === 'bank') {
@@ -1102,7 +1213,7 @@ function auditView() {
 }
 
 function jobsView() {
-  const pid = S.me, open = S.gigs.filter(g => g.status === 'open' && !(g.failedBy || []).includes(pid)).sort((a, c) => c.pay - a.pay);
+  const pid = S.me, open = S.gigs.filter(g => g.status === 'open' && g.postedBy !== pid && !(g.failedBy || []).includes(pid)).sort((a, c) => c.pay - a.pay);
   const failed = S.gigs.filter(g => (g.status === 'failed' && g.claimedBy === pid) || (g.failedBy || []).includes(pid)).length;
   const mine = activeGigs(pid), full = mine.length >= 2;
   const done = S.gigs.filter(g => g.claimedBy === pid && g.status === 'paid').sort((a, c) => (c.paidAt || 0) - (a.paidAt || 0));
@@ -1113,11 +1224,15 @@ function jobsView() {
     ? `<div class="shop"><div class="panel-head"><b>${esc(g.title)}</b><span class="row" style="gap:8px"><span class="pill ${TIER[tierFor(g.pay)][1]}">${TIER[tierFor(g.pay)][0]}</span><span class="amt pos">${money(g.pay)}</span></span></div><p class="muted">To finish the job, solve this:</p><p class="problem">${esc(g.q)}</p>
         <form class="inline" data-form="gigAnswer" data-id="${g.id}"><label>Your answer<input id="ga-${g.id}" inputmode="decimal" required autocomplete="off"></label><button class="btn gold">Finish job</button><button type="button" class="btn ghost" data-act="quitGig" data-id="${g.id}">Quit</button></form>
         <small class="${g.tries ? 'neg' : 'muted'}">${triesFor(pid) - (g.tries || 0)} of ${triesFor(pid)} tries left</small></div>`
-    : `<div class="shop"><div class="panel-head"><b>${esc(g.title)}</b><span class="amt pos">${money(g.pay)}</span></div><p class="muted">${g.note ? 'The banker says: ' + esc(g.note) + '. ' : ''}Do the job for real, then tap below. The banker checks before paying.</p><div class="row"><button class="btn gold" data-act="finishGig" data-id="${g.id}">I finished</button><button class="btn ghost" data-act="quitGig" data-id="${g.id}">Quit</button></div></div>`;
+    : `<div class="shop"><div class="panel-head"><b>${esc(g.title)}</b><span class="amt pos">${money(g.pay)}</span></div><p class="muted">${g.note ? (g.kind === 'request' ? esc(nameOf(g.postedBy)) : 'The banker') + ' says: ' + esc(g.note) + '. ' : ''}Do the job for real, then tap below. ${g.kind === 'request' ? esc(nameOf(g.postedBy)) + ' checks it' : 'The banker checks'} before paying.</p><div class="row"><button class="btn gold" data-act="finishGig" data-id="${g.id}">I finished</button><button class="btn ghost" data-act="quitGig" data-id="${g.id}">Quit</button></div></div>`;
   return `<div class="cols"><div class="stack">
     <div><p class="eyebrow">Odd jobs board · Day ${today()}</p><h2>Earn extra money</h2></div>
     ${mine.length ? `<section class="panel"><h3>Your jobs</h3>${mine.map(myCard).join('')}</section>` : ''}
-    <section class="panel"><h3>Jobs available</h3>${open.length ? `<div class="list">${open.map(g => `<div class="li"><span class="badge">${g.kind === 'random' ? 'JOB' : 'REAL'}</span><div class="main"><b>${esc(g.title)}</b><small>${g.kind === 'random' ? `<span class="pill ${TIER[tierFor(g.pay)][1]}" style="font-size:.7rem;padding:1px 7px">${TIER[tierFor(g.pay)][0]}</span> · gone after Day ` + g.expiresDay : 'A real task from the banker, checked before you’re paid'}</small></div><span class="amt pos">${money(g.pay)}</span><button class="btn sm" data-act="claimGig" data-id="${g.id}" ${full ? 'disabled' : ''}>Take it</button></div>`).join('')}</div>
+    <section class="panel"><h3>Ask for help</h3><p class="muted" style="font-size:.88rem">Post a request and another resident can take it. Your money is held by the bank until you say the job is done.</p>
+      <form class="inline" data-form="postRequest"><label>What do you need?<input id="rq-t" required maxlength="50" placeholder="Wash my bike"></label><label style="flex:0 1 120px">You’ll pay<input id="rq-p" inputmode="decimal" required placeholder="3.00"></label><button class="btn">Post</button></form>
+      ${myRequests(pid).length ? `<div class="list">${myRequests(pid).map(g => `<div class="li"><div class="main"><b>${esc(g.title)} · ${money(g.pay)}</b><small>${g.status === 'open' ? 'Waiting for someone to take it' : g.status === 'claimed' ? esc(nameOf(g.claimedBy)) + ' is working on it' : esc(nameOf(g.claimedBy)) + ' says it’s done. Check it!'}</small></div>
+        ${g.status === 'open' ? `<button class="btn ghost sm" data-act="cancelReq" data-id="${g.id}">Cancel</button>` : g.status === 'review' ? `<button class="btn sm" data-act="approveReq" data-id="${g.id}">Done, pay them</button><button class="btn ghost sm" data-act="rejectReq" data-id="${g.id}">Not done yet</button>` : ''}</div>`).join('')}</div>` : ''}</section>
+    <section class="panel"><h3>Jobs available</h3>${open.length ? `<div class="list">${open.map(g => `<div class="li"><span class="badge">${g.kind === 'random' ? 'JOB' : g.kind === 'request' ? 'ASK' : 'REAL'}</span><div class="main"><b>${esc(g.title)}</b><small>${g.kind === 'request' ? 'Request from ' + esc(nameOf(g.postedBy)) + ' · they check before paying' : g.kind === 'random' ? `<span class="pill ${TIER[tierFor(g.pay)][1]}" style="font-size:.7rem;padding:1px 7px">${TIER[tierFor(g.pay)][0]}</span> · gone after Day ` + g.expiresDay : 'A real task from the banker, checked before you’re paid'}</small></div><span class="amt pos">${money(g.pay)}</span><button class="btn sm" data-act="claimGig" data-id="${g.id}" ${full ? 'disabled' : ''}>Take it</button></div>`).join('')}</div>
       ${full ? '<p class="muted" style="font-size:.85rem">You have two jobs going. Finish one before taking another.</p>' : ''}` : '<div class="empty">No jobs right now. New ones show up every morning.</div>'}</section>
   </div><div class="stack">
     <section class="panel"><div class="stats"><div class="stat"><b>${money(earned)}</b><span>Earned from odd jobs</span></div><div class="stat"><b>${done.length}</b><span>Jobs finished</span></div><div class="stat"><b>${failed}</b><span>Jobs failed</span></div></div>
@@ -1211,6 +1326,8 @@ function tattler(D) {
   if (mover) out.push(`Moving day! <b>${esc(nameOf(mover.from.split('.')[0]))}</b> has a new place: ${esc((mover.memo || '').replace(/^(First rent · |Bought the |Down payment on the )/, ''))}. Housewarming party when?`);
   const job = S.gigs.filter(g => g.status === 'paid' && g.paidDay === D && g.kind === 'random' && !g.tries)[0];
   if (job) out.push(`Hard worker of the day: <b>${esc(nameOf(job.claimedBy))}</b> finished “${esc(job.title)}” and nailed the math on the first try.`);
+  const placed = S.tx.filter(t => t.kind === 'rent' && t.day === D && /placed by the town/.test(t.memo || '')).length;
+  if (placed) out.push(`Moving trucks spotted! The town found ${placed === 1 ? 'a resident' : placed + ' residents'} a place to live after they forgot to pick one. Home sweet (cheapest) home.`);
   const late = S.bills.filter(b => b.lateFee && b.dueDay === D - 1).length;
   if (late) out.push(`A friendly reminder from the Tattler: ${late === 1 ? 'a certain resident’s bill is' : late + ' bills are'} now overdue. We won’t name names. You know who you are.`);
   const tickets = S.bills.filter(b => b.kind === 'fine' && b.issuedDay === D);
@@ -1328,10 +1445,10 @@ function inspectorView() {
 }
 
 function bankJobsView() {
-  const review = S.gigs.filter(g => g.status === 'review'), active = S.gigs.filter(g => g.status === 'open' || g.status === 'claimed').sort((a, c) => c.at - a.at);
+  let review = S.gigs.filter(g => g.status === 'review'), active = S.gigs.filter(g => g.status === 'open' || g.status === 'claimed').sort((a, c) => c.at - a.at);
   const paid = S.gigs.filter(g => g.status === 'paid').sort((a, c) => (c.paidAt || 0) - (a.paidAt || 0)).slice(0, 15);
   return `<div class="cols"><div class="stack">
-    <section class="panel"><h3>Waiting for your OK</h3>${review.length ? review.map(g => `<div class="shop"><div class="panel-head"><b>${esc(nameOf(g.claimedBy))} finished: ${esc(g.title)}</b><span class="amt">${money(g.pay)}</span></div>
+    <section class="panel"><h3>Waiting for your OK</h3>${(review = review.filter(g => g.kind !== 'request')).length ? review.map(g => `<div class="shop"><div class="panel-head"><b>${esc(nameOf(g.claimedBy))} finished: ${esc(g.title)}</b><span class="amt">${money(g.pay)}</span></div>
       <form class="inline" data-form="gigReview" data-id="${g.id}"><label>Note if it isn’t done (optional)<input id="gr-${g.id}" maxlength="80" placeholder="Missed a spot by the door"></label><button type="button" class="btn" data-act="approveGig" data-id="${g.id}">Approve & pay</button><button class="btn ghost">Not done yet</button></form></div>`).join('') : '<div class="empty">Nothing to check.</div>'}</section>
     <section class="panel"><h3>Jobs on the board</h3>${active.length ? `<div class="list">${active.map(g => `<div class="li"><span class="badge">${g.kind === 'random' ? 'JOB' : 'REAL'}</span><div class="main"><b>${esc(g.title)}</b><small>${g.status === 'claimed' ? 'Taken by ' + esc(nameOf(g.claimedBy)) : 'Open'}${g.kind === 'random' ? ' · ' + TIER[tierFor(g.pay)][0] : ''}${g.kind === 'random' ? ' · gone after Day ' + g.expiresDay : ''}</small></div><span class="amt">${money(g.pay)}</span><button class="btn danger sm" data-act="removeGig" data-id="${g.id}">Remove</button></div>`).join('')}</div>` : '<div class="empty">The board is empty.</div>'}
       <div><button class="btn ghost sm" data-act="runNow" data-id="gigs">Post random town jobs now</button></div></section>
@@ -1350,7 +1467,8 @@ function manageBiz(shop) {
   const sales = kept.reduce((s, o) => s + o.total, 0), tips = kept.reduce((s, o) => s + (o.tip || 0), 0);
   const sid = shop.id, pct = salePct(shop);
   return `<div class="panel-head"><div><p class="eyebrow">${shop.ownerId === 'bank' ? 'Run by the town bank' : 'Your ' + T.noun}</p><h2>${esc(shop.name)}</h2></div><button class="btn danger sm" data-act="closeShop" data-id="${sid}">Close ${T.noun}</button></div>
-    <div class="stats"><div class="stat"><b>${money(sales)}</b><span>Total sales</span></div>${T.tips ? `<div class="stat"><b>${money(tips)}</b><span>Tips earned</span></div>` : ''}<div class="stat"><b>${money(sharePrice(sid))}</b><span>Share price · ${sharesOut(sid)} of ${SHARES} owned by investors</span></div><div class="stat"><b>${orders.filter(o => o.status === 'new').length}</b><span>Orders waiting</span></div></div>
+    ${lowStock(shop).length ? `<div class="alert bad"><span><b>Running low:</b> ${lowStock(shop).map(i => `${esc(i.name)} (${i.stock === 0 ? 'sold out' : i.stock + ' left'})`).join(', ')}. Restock below.</span></div>` : ''}
+    <div class="stats"><div class="stat"><b>${money(sales)}</b><span>Total sales</span></div>${t === 'farm' ? `<div class="stat"><b>${money(S.tx.filter(x => x.kind === 'supply' && x.supplierShopId === sid).reduce((a, x) => a + x.amount, 0))}</b><span>Sold to restaurants</span></div>` : ''}${T.restock ? `<div class="stat"><b>${money(supplySpend(sid))}</b><span>Spent on stock</span></div><div class="stat"><b class="${sales - supplySpend(sid) >= 0 ? 'pos' : 'neg'}">${money(sales - supplySpend(sid), true)}</b><span>Profit so far</span></div>` : ''}${T.tips ? `<div class="stat"><b>${money(tips)}</b><span>Tips earned</span></div>` : ''}<div class="stat"><b>${money(sharePrice(sid))}</b><span>Share price · ${sharesOut(sid)} of ${SHARES} owned by investors</span></div><div class="stat"><b>${orders.filter(o => o.status === 'new').length}</b><span>Orders waiting</span></div></div>
     ${(() => { const n = inspNotice(shop); return n ? `<div class="alert ${n.cls === 'bad' ? 'bad' : n.cls === 'note' ? 'news' : ''}"><span><b>${n.short === 'Today' || n.short === 'Overdue' ? '' : 'Inspection · '}${esc(n.text)}</b></span></div>` : ''; })()}
     ${isOpenBiz(shop) ? '' : `<div class="alert bad"><span><b>${closedWhy(shop)}.</b> Customers can’t buy anything until ${failedInsp(shop) ? 'it earns a C or better on re-inspection' + (shop.inspection?.nextDue ? ' (Day ' + shop.inspection.nextDue + ')' : '') : 'the license is renewed'}.</span></div>`}
     <div class="cols even"><div class="stack">
@@ -1375,13 +1493,17 @@ function manageBiz(shop) {
       <section class="panel"><h3>Add to the ${T.list.toLowerCase()}</h3><form data-form="addItem" data-id="${sid}"><div class="fields">
         <label>${T.item}<input id="ai-n-${sid}" required maxlength="40" placeholder="${T.iph}"></label>
         <label>Price${T.hotel ? ' per night' : ''}<input id="ai-p-${sid}" inputmode="decimal" required placeholder="${T.hotel ? '8.00' : '2.00'}"></label>
-        <label>${T.stockLbl}<input id="ai-s-${sid}" type="number" min="${T.hotel ? 1 : 0}" placeholder="${T.hotel ? 'How many rooms' : 'Blank = unlimited'}" ${T.hotel ? 'required' : ''}></label></div>
+        <label>${T.restock ? 'Starting stock to buy' : T.stockLbl}<input id="ai-s-${sid}" type="number" min="${T.hotel ? 1 : 0}" placeholder="${T.hotel ? 'How many rooms' : T.restock ? 'How many' : 'Blank = unlimited'}" ${T.hotel || T.restock ? 'required' : ''}></label></div>
+        ${T.restock ? `<p class="muted" style="font-size:.85rem">Stock costs ${cfg('wholesalePct')}% of your selling price from the town wholesaler (at least ${money(25)} each). It comes out of your checking.</p>` : ''}
         <div><button class="btn">Add</button></div></form></section>
-      <section class="panel"><h3>${T.list}</h3><div class="list">${items.length ? items.map(i => `<form class="li" data-form="editItem" data-id="${i.id}" style="display:flex">
-        <div class="main"><b>${esc(i.name)}</b>${pct ? `<small class="neg">On sale: ${money(priceNow(i, shop))}</small>` : ''}</div>
+      <section class="panel"><h3>${T.list}</h3><div class="list">${items.length ? items.map(i => `<div style="border-top:1px solid var(--line);padding:10px 0;display:grid;gap:8px"><form class="inline" data-form="editItem" data-id="${i.id}" style="flex-wrap:nowrap;align-items:center">
+        <div class="main" style="flex:1;min-width:0"><b>${esc(i.name)}</b>${T.restock ? `<small class="${i.stock === 0 ? 'neg' : i.stock != null && i.stock <= 2 ? 'neg' : 'muted'}" style="display:block">${i.stock == null ? 'Starter stock arrives next day' : i.stock === 0 ? 'SOLD OUT' : i.stock + ' in stock'}</small>` : ''}${pct ? `<small class="neg" style="display:block">On sale: ${money(priceNow(i, shop))}</small>` : ''}</div>
         <input id="ei-p-${i.id}" inputmode="decimal" value="${(i.price / 100).toFixed(2)}" style="width:86px;min-height:40px;padding:6px 8px" aria-label="Price">
-        <input id="ei-s-${i.id}" type="number" min="0" value="${i.stock ?? ''}" placeholder="∞" style="width:70px;min-height:40px;padding:6px 8px" aria-label="Stock">
-        <button class="btn ghost sm">Save</button><button type="button" class="btn danger sm" data-act="removeItem" data-id="${i.id}" aria-label="Remove">✕</button></form>`).join('') : `<div class="empty">Add your first ${T.item.toLowerCase()}.</div>`}</div></section>
+        ${T.restock ? '' : `<input id="ei-s-${i.id}" type="number" min="0" value="${i.stock ?? ''}" placeholder="∞" style="width:70px;min-height:40px;padding:6px 8px" aria-label="${T.stockLbl}">`}
+        <button class="btn ghost sm">Save</button><button type="button" class="btn danger sm" data-act="removeItem" data-id="${i.id}" aria-label="Remove">✕</button></form>
+        ${T.restock && i.stock != null ? (() => { const farms = t === 'restaurant' ? Object.values(S.shops).filter(f => bizType(f) === 'farm' && f.ownerId !== shop.ownerId && isOpenBiz(f)) : []; const fc = Math.round(unitCost(i) * (100 - cfg('farmDiscount')) / 100);
+          return `<form class="inline" data-form="restock" data-id="${i.id}" style="align-items:center"><label style="flex:0 1 auto">Restock<input id="rs-${i.id}" type="number" min="1" value="5" style="width:80px"></label>
+          ${farms.length ? `<label style="flex:1 1 200px">From<select id="rs-src-${i.id}">${farms.map(f => `<option value="${f.id}">${esc(f.name)} · ${money(fc)} each (local farm)</option>`).join('')}<option value="w">Town wholesaler · ${money(unitCost(i))} each</option></select></label>` : `<span class="muted" style="font-size:.85rem">${money(unitCost(i))} each from the wholesaler</span>`}<button class="btn gold sm">Buy stock</button></form>`; })() : ''}</div>`).join('') : `<div class="empty">Add your first ${T.item.toLowerCase()}.</div>`}</div></section>
     </div></div>`;
 }
 
@@ -1450,7 +1572,7 @@ function bankView() {
     const willPay = d % every('payEvery') === 0, willInt = d % every('interestEvery') === 0, willBill = d % every('billEvery') === 0, willRent = d % every('rentEvery') === 0;
     const willLate = S.bills.filter(x => x.status === 'due' && x.dueDay < d), willCd = S.cds.filter(c => c.status === 'open' && c.matureDay <= d);
     const housed = ps.filter(p => p.home && p.home.mode !== 'own').length;
-    const happens = [willPay && `Payday: ${paid.length} paycheck${paid.length === 1 ? '' : 's'}${S.settings.payBonus ? ` with a ${S.settings.payBonus}% bonus` : ''}`, willBill && `Utility bills to ${ps.length} resident${ps.length === 1 ? '' : 's'} (${money(billTotal())} each)`, willRent && housed && `Rent and mortgage bills for ${housed} home${housed > 1 ? 's' : ''}`, willInt && `Interest day for loans and savings${Number(S.settings.savingsBoost || 1) > 1 ? ' (savings doubled)' : ''}`, willCd.length && `${willCd.length} CD${willCd.length > 1 ? 's' : ''} mature and pay out`, willLate.length && `${willLate.length} unpaid bill${willLate.length > 1 ? 's' : ''} turn late (+${money(cfg('lateFee'))} fee each)`, d % every('lotteryEvery') === 0 && lottoTickets().length && `Lottery drawing: ${lottoTickets().length} tickets, ${money(lottoPot())} jackpot`, cfg('gigsPerDay') > 0 && ps.length && `${Math.round(cfg('gigsPerDay'))} new odd jobs on the board`, Object.values(S.shops).filter(sh => sh.license?.status === 'active' && sh.license.expiresDay < d).length && `${Object.values(S.shops).filter(sh => sh.license?.status === 'active' && sh.license.expiresDay < d).length} business license(s) expire`, Object.values(S.shops).filter(sh => sh.inspection?.nextDue === d).length && `${Object.values(S.shops).filter(sh => sh.inspection?.nextDue === d).length} inspection(s) come due`, cfg('surpriseChance') > 0 && ps.length && `${Math.round(cfg('surpriseChance'))}% chance of a surprise bill`, cfg('marketChance') > 0 && !marketActive(d) && `${Math.round(cfg('marketChance'))}% chance of a stock market boom or crash`, cfg('eventChance') > 0 && `${Math.round(cfg('eventChance'))}% chance of a town event`].filter(Boolean);
+    const happens = [willPay && `Payday: ${paid.length} paycheck${paid.length === 1 ? '' : 's'}${S.settings.payBonus ? ` with a ${S.settings.payBonus}% bonus` : ''}`, willBill && `Utility bills to ${ps.length} resident${ps.length === 1 ? '' : 's'} (${money(billTotal())} each)`, willRent && housed && `Rent and mortgage bills for ${housed} home${housed > 1 ? 's' : ''}`, willInt && `Interest day for loans and savings${Number(S.settings.savingsBoost || 1) > 1 ? ' (savings doubled)' : ''}`, willCd.length && `${willCd.length} CD${willCd.length > 1 ? 's' : ''} mature and pay out`, willLate.length && `${willLate.length} unpaid bill${willLate.length > 1 ? 's' : ''} turn late (+${money(cfg('lateFee'))} fee each)`, d % every('lotteryEvery') === 0 && lottoTickets().length && `Lottery drawing: ${lottoTickets().length} tickets, ${money(lottoPot())} jackpot`, cfg('gigsPerDay') > 0 && ps.length && `${Math.round(cfg('gigsPerDay'))} new odd jobs on the board`, Object.values(S.shops).filter(sh => sh.license?.status === 'active' && sh.license.expiresDay < d).length && `${Object.values(S.shops).filter(sh => sh.license?.status === 'active' && sh.license.expiresDay < d).length} business license(s) expire`, Object.values(S.shops).filter(sh => sh.inspection?.nextDue === d).length && `${Object.values(S.shops).filter(sh => sh.inspection?.nextDue === d).length} inspection(s) come due`, d % every('dividendEvery') === 0 && S.holdings.some(h => h.shares > 0) && `Profit sharing day: shareholders get ${cfg('profitShare')}% of each business’s profit`, ps.length && cfg('needsCount') > 0 && `Yesterday’s daily needs are checked: ${money(cfg('needsBonus'))} bonus for meeting all, ${money(cfg('needsPenalty'))} for each missed`, cfg('surpriseChance') > 0 && ps.length && `${Math.round(cfg('surpriseChance'))}% chance of a surprise bill`, cfg('marketChance') > 0 && !marketActive(d) && `${Math.round(cfg('marketChance'))}% chance of a stock market boom or crash`, cfg('eventChance') > 0 && `${Math.round(cfg('eventChance'))}% chance of a town event`].filter(Boolean);
     const unpaid = S.bills.filter(x => x.status === 'due' || x.status === 'late').sort((a, c) => a.dueDay - c.dueDay);
     return `<div class="cols"><div class="stack">
       <section class="panel"><div class="panel-head"><div><p class="eyebrow">Today in ${esc(S.settings.name)}</p><div class="bigday">Day ${today()}</div></div>
@@ -1466,6 +1588,12 @@ function bankView() {
       <section class="panel"><h3>Pay stubs for next payday</h3>${paid.length ? `<div class="tbl-wrap"><table><thead><tr><th>Resident</th><th>Job</th><th class="r">Gross</th><th class="r">Tax ${tr}%</th><th class="r">Take-home</th></tr></thead><tbody>
         ${paid.map(p => { const g = Math.round(p.wage * (100 + Number(S.settings.payBonus || 0)) / 100), t = Math.round(g * tr / 100); return `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.job || '—')}</td><td class="r num">${money(g)}</td><td class="r num neg">${money(-t)}</td><td class="r num"><b>${money(g - t)}</b></td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty">Nobody has a wage yet. Set jobs and wages under Residents.</div>'}</section>
     </div><div class="stack">
+      <section class="panel"><h3>Auto days</h3>
+        ${S.settings.autoOn ? `<p>A new day starts every <b>${Math.round(cfg('autoMinutes'))} minutes</b>. Next day in <b>${Math.max(0, Math.ceil((S.settings.autoNextAt - Date.now()) / 60000))} min</b>.</p>
+          <p class="muted" style="font-size:.85rem">${ls('ptb.autoHost') === '1' ? 'This device runs the clock. Keep the app open on it.' : 'Another device runs the clock. Keep the app open there.'}</p>
+          <div><button class="btn ghost sm" data-act="stopAuto">Pause auto days</button></div>`
+        : `<p class="muted" style="font-size:.88rem">Let the days roll forward on their own during play, so paydays, bills and drawings keep coming. The device you start it on runs the clock, so keep the app open there.</p>
+          <div class="inline"><label>New day every<select id="auto-min">${[5, 10, 15, 20, 30].map(m => `<option value="${m}" ${m === Math.round(cfg('autoMinutes')) ? 'selected' : ''}>${m} minutes</option>`).join('')}</select></label><button class="btn gold" data-act="startAuto">Start auto days</button></div>`}</section>
       <section class="panel lotto"><p class="eyebrow">Town lottery · drawing #${lotto().drawNo}</p><div class="bigday num" style="font-size:2.4rem">${money(lottoPot())}</div>
         <p>${lottoTickets().length} ticket${lottoTickets().length === 1 ? '' : 's'} sold · drawing ${dayIn(nextOn('lotteryEvery'))}</p><div><button class="btn sm" style="background:#1b1205;color:#fff" data-act="runNow" data-id="lottery">Draw now</button></div></section>
       <section class="panel"><h3>Stock market</h3><p class="muted" style="font-size:.88rem">Booms and crashes happen at random: a ${Math.round(cfg('marketChance'))}% chance each new day, never two at once. A boom climbs 25–60% over a few days, then the bubble pops. A crash drops 25–50% and recovers over a few days. Change the chance in Settings.</p>
@@ -1574,6 +1702,13 @@ function bankView() {
         <label>Early CD penalty (%)<input id="st-cdp" inputmode="decimal" value="${cfg('cdPenalty')}"></label></div></section>
       <section class="panel"><h3>Lottery, stocks & odd jobs</h3><div class="fields">
         <label>Chance of a boom or crash each day (%)<input id="st-mkt" type="number" min="0" max="100" value="${Math.round(cfg('marketChance'))}"></label>
+        <label>Daily needs per resident<input id="st-ndn" type="number" min="0" max="4" value="${Math.round(cfg('needsCount'))}"></label>
+        <label>Bonus for meeting all needs<input id="st-ndb" inputmode="decimal" value="${(cfg('needsBonus') / 100).toFixed(2)}"></label>
+        <label>Cost per missed need<input id="st-ndp" inputmode="decimal" value="${(cfg('needsPenalty') / 100).toFixed(2)}"></label>
+        <label>Stamp card reward (5 stamps)<input id="st-stmp" inputmode="decimal" value="${(cfg('stampReward') / 100).toFixed(2)}"></label>
+        <label>Farm discount for restaurants (%)<input id="st-farm" inputmode="decimal" value="${cfg('farmDiscount')}"></label>
+        <label>Profit sharing to shareholders (% of profit)<input id="st-psh" inputmode="decimal" value="${cfg('profitShare')}"></label>
+        <label>Profit sharing every (days)<input id="st-pse" type="number" min="1" value="${every('dividendEvery')}"></label>
         <label>Stock market swings<select id="st-swing">${[[3, 'Calm (about 3% a day)'], [8, 'Normal (about 8% a day)'], [15, 'Wild (about 15% a day)'], [0, 'Off (sales only)']].map(([v, l]) => `<option value="${v}" ${Math.round(cfg('stockSwing')) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
         <label>Pick 3 ticket price<input id="st-lp" inputmode="decimal" value="${c2(cfg('pick3Price'))}"></label>
         <label>Drawing every (days)<input id="st-le" type="number" min="1" value="${every('lotteryEvery')}"></label>
@@ -1588,7 +1723,7 @@ function bankView() {
         <label>New town jobs each day<input id="st-gigs" type="number" min="0" max="16" value="${Math.round(cfg('gigsPerDay'))}"></label></div></section>
       <section class="panel"><h3>Business rules</h3>
         ${Object.keys(BIZ).map(t => `<div class="fields"><label>${BIZ[t].Noun}: cost to open<input id="bc-${t}" inputmode="decimal" value="${(bizCost(t) / 100).toFixed(2)}"></label><label>Inspect every (days)<input id="br-i-${t}" type="number" min="1" value="${bizRule(t, 'inspect')}"></label><label>License lasts (days)<input id="br-l-${t}" type="number" min="1" value="${bizRule(t, 'license')}"></label></div>`).join('')}
-        <div class="fields"><label>Most businesses one resident can run<input id="st-bizlim" type="number" min="1" max="8" value="${bizLimit()}"></label><label>License renewal (% of opening cost)<input id="st-renew" inputmode="decimal" value="${cfg('renewPct')}"></label></div></section>
+        <div class="fields"><label>Wholesale cost (% of selling price)<input id="st-whole" inputmode="decimal" value="${cfg('wholesalePct')}"></label><label>Most businesses one resident can run<input id="st-bizlim" type="number" min="1" max="8" value="${bizLimit()}"></label><label>License renewal (% of opening cost)<input id="st-renew" inputmode="decimal" value="${cfg('renewPct')}"></label></div></section>
       <section class="panel"><h3>Homes</h3><div class="fields">
         <label>Mortgage interest per period (%)<input id="st-mr" inputmode="decimal" value="${cfg('mortgageRate')}"></label>
         <label>Mortgage length (payments)<input id="st-mt" type="number" min="1" value="${every('mortgageTerm')}"></label>
@@ -1643,6 +1778,7 @@ const acts = {
   claimGig: id => run(async () => {
     if (activeGigs(S.me).length >= 2) fail('Finish one of your jobs first.');
     const g = S.gigs.find(x => x.id === id), ref = db.doc('gigs/' + id);
+    if (g?.postedBy === S.me) fail('That’s your own request.');
     const [q, raw] = g && g.kind === 'random' ? makeProblem(levelFor(S.me, g.pay)) : [null, null], a = raw == null ? null : Math.round(raw * 100) / 100;
     await db.runTransaction(async t => { const d = await t.get(ref); if (!d.exists || d.data().status !== 'open') fail('Someone else took that job.'); if ((d.data().failedBy || []).includes(S.me)) fail('You already failed this job. Try a different one.'); t.update(ref, {status: 'claimed', claimedBy: S.me, q, a, tries: 0, note: null, claimedDay: today()}); });
     toast('Job taken. Get to work!');
@@ -1654,7 +1790,7 @@ const acts = {
     }, true);
     run(async () => { await db.doc('gigs/' + id).update({status: 'open', claimedBy: null, q: null, a: null, tries: 0}); toast('You put that job back on the board'); });
   },
-  finishGig: id => run(async () => { await db.doc('gigs/' + id).update({status: 'review'}); toast('Sent to the banker to check'); }),
+  finishGig: id => run(async () => { const g = S.gigs.find(x => x.id === id); await db.doc('gigs/' + id).update({status: 'review'}); if (g?.kind === 'request') await sendMsg(S.me, g.postedBy, `I finished “${g.title}.” Check it on the Odd jobs tab and pay me if it looks good!`); toast(`Sent to ${g ? reviewerOf(g) : 'the banker'} to check`); }),
   approveGig: id => run(async () => {
     const g = S.gigs.find(x => x.id === id); if (!g || g.status !== 'review') fail('That job was already handled.');
     await addTx('bank', g.claimedBy + '.c', g.pay, 'job', `Odd job: ${g.title}`);
@@ -1662,7 +1798,16 @@ const acts = {
     await db.collection('messages').add({from: 'bank', to: g.claimedBy, text: `Nice work on “${g.title}.” ${money(g.pay)} is in your checking.`, day: today(), at: Date.now()});
     toast(`Paid ${nameOf(g.claimedBy)} ${money(g.pay)}`);
   }),
-  removeGig: id => run(async () => { await db.doc('gigs/' + id).delete(); toast('Job removed'); }),
+  removeGig: id => run(async () => { const g = S.gigs.find(x => x.id === id); if (g?.kind === 'request' && ['open', 'claimed', 'review'].includes(g.status)) await addTx('bank', g.postedBy + '.c', g.pay, 'escrow', `Refund: request “${g.title}” was removed`); await db.doc('gigs/' + id).delete(); toast('Job removed'); }),
+  cancelReq: id => run(async () => { const g = S.gigs.find(x => x.id === id); if (!g || g.status !== 'open') fail('Someone already took it.'); await addTx('bank', g.postedBy + '.c', g.pay, 'escrow', `Refund: canceled request “${g.title}”`); await db.doc('gigs/' + id).update({status: 'cancelled'}); toast('Request canceled and refunded'); }),
+  approveReq: id => run(async () => {
+    const g = S.gigs.find(x => x.id === id); if (!g || g.status !== 'review') fail('That was already handled.');
+    await addTx('bank', g.claimedBy + '.c', g.pay, 'job', `Request from ${nameOf(g.postedBy)}: ${g.title}`);
+    await db.doc('gigs/' + id).update({status: 'paid', paidDay: today(), paidAt: Date.now()});
+    await sendMsg(g.postedBy, g.claimedBy, `Thanks for doing “${g.title}.” I paid you ${money(g.pay)}.`);
+    toast(`Paid ${nameOf(g.claimedBy)} ${money(g.pay)}`);
+  }),
+  rejectReq: id => run(async () => { const g = S.gigs.find(x => x.id === id); if (!g || g.status !== 'review') return; await db.doc('gigs/' + id).update({status: 'claimed', note: 'Not finished yet'}); await sendMsg(g.postedBy, g.claimedBy, `“${g.title}” isn’t done yet. Finish it and tap “I finished” again.`); toast('Sent back'); }),
   surprise: who => run(async () => {
     const ps = playerList(); if (!ps.length) fail('Add residents first.');
     const got = await sendSurprise(who === 'all' ? ps : [pickRandom(ps)], today());
@@ -1734,27 +1879,14 @@ const acts = {
   modalYes: () => { const f = S.modal?.fn; S.modal = null; render(); if (f) run(f); },
   advance: () => {
     const d = today() + 1;
-    confirmIt(`Advance to Day ${d}?`, 'Everything scheduled for that day runs now: paydays, bills, rent, interest, CDs and late fees, plus maybe a town event. This can’t be undone.', `Start Day ${d}`, async () => {
-      const patch = {}, done = [];
-      const late = await markLate(d); if (late) done.push(late);
-      const cd = await doCds(d); if (cd) done.push(cd);
-      { const r = await doLicenses(d); if (r) done.push(r); }
-      if (d % every('payEvery') === 0) { const r = await doPayday(patch); if (r) done.push(r); }
-      if (d % every('billEvery') === 0) { const r = await doUtilities(d); if (r) done.push(r); }
-      if (d % every('rentEvery') === 0) { const r = await doHousing(d); if (r) done.push(r); }
-      if (d % every('interestEvery') === 0) { const r = await doInterest(patch); if (r) done.push(r); }
-      if (d % every('lotteryEvery') === 0) { const r = await doLottery(d, patch); if (r) done.push(r); }
-      { const r = await doHotels(d); if (r) done.push(r); }
-      { const r = await doAudits(d); if (r) done.push(r); }
-      if (!marketActive(d) && Math.random() * 100 < cfg('marketChance')) done.push(await startMarket(Math.random() < .5 ? 'boom' : 'crash', d, patch));
-      { const r = await doGigs(d); if (r) done.push(r); }
-      if (playerList().length && Math.random() * 100 < cfg('surpriseChance')) { const g = await sendSurprise([pickRandom(playerList())], d); done.push('surprise bill for ' + g[0].split(':')[0]); }
-      if (Math.random() * 100 < cfg('eventChance')) { const r = await drawEvent(d, patch); if (r) done.push(r); }
-      patch.day = d;
-      await db.doc('town/settings').update(patch);
-      toast(`Good morning, Day ${d}!` + (done.length ? ' ' + done.join(', ') + '.' : ''));
-    });
+    confirmIt(`Advance to Day ${d}?`, 'Everything scheduled for that day runs now: paydays, bills, rent, interest, CDs and late fees, plus maybe a town event. This can’t be undone.', `Start Day ${d}`, advanceDay);
   },
+  startAuto: () => run(async () => {
+    const m = Math.max(1, parseInt(val('auto-min'), 10) || cfg('autoMinutes'));
+    await db.doc('town/settings').update({autoOn: true, autoMinutes: m, autoNextAt: Date.now() + m * 60000});
+    ls('ptb.autoHost', '1'); toast(`Auto days on: a new day every ${m} minutes`);
+  }),
+  stopAuto: () => run(async () => { await db.doc('town/settings').update({autoOn: false, autoNextAt: null}); ls('ptb.autoHost', null); toast('Auto days paused'); }),
   runNow: what => {
     const label = {boom: 'Start a stock market boom?', crash: 'Trigger a stock market crash?', pay: 'Run a payday now?', bills: 'Send utility bills now?', interest: 'Run interest now?', event: 'Draw a town event card?', lottery: 'Hold the lottery drawing now?', gigs: 'Post new random jobs now?'}[what];
     confirmIt(label, 'This happens right away and doesn’t change the day or the schedule.', 'Do it', async () => {
@@ -1800,7 +1932,13 @@ const acts = {
     await addTx(S.me + '.c', acctOf(shop.ownerId), total, bizType(shop) === 'restaurant' ? 'meal' : 'purchase', `${qty} × ${it.name} at ${shop.name}` + (isHotel ? ` for the night of Day ${stay}` : '') + (pct ? ` (${pct}% off)` : '') + (tip ? ` + ${money(tip)} tip` : ''));
     if (!isHotel && it.stock != null) await db.doc('items/' + id).update({stock: it.stock - qty});
     await db.collection('orders').add({shopId: shop.id, bizType: bizType(shop), stayDay: stay, itemId: id, itemName: it.name, qty, price: unit, salePct: pct, tip, total, buyerId: S.me, sellerId: shop.ownerId, status: 'new', day: today(), at: Date.now()});
-    clear('q-' + id); toast(isHotel ? `Booked ${qty} × ${it.name} for ${stay === today() ? 'tonight' : 'Day ' + stay}` : `Ordered ${qty} × ${it.name}` + (pct ? ` and saved ${money((it.price - unit) * qty)}` : ''));
+    let stampMsg = '';
+    if (shop.ownerId !== 'bank' && total >= 100) {
+      const st = stampsOf(S.me) + (S.orders.some(o => o.buyerId === S.me && o.at > Date.now() - 2000) ? 0 : 1), redeemed = Number(S.players[S.me]?.stampsRedeemed || 0);
+      if (Math.floor(st / STAMPS_PER) > redeemed && cfg('stampReward') > 0) { await addTx('bank', S.me + '.c', cfg('stampReward'), 'stamps', 'Shop-local stamp card filled!'); await db.doc('players/' + S.me).update({stampsRedeemed: redeemed + 1}); stampMsg = ` Stamp card full: +${money(cfg('stampReward'))}!`; }
+      else stampMsg = ` Stamp ${st % STAMPS_PER || STAMPS_PER} of ${STAMPS_PER}.`;
+    }
+    clear('q-' + id); toast((isHotel ? `Booked ${qty} × ${it.name} for ${stay === today() ? 'tonight' : 'Day ' + stay}` : `Ordered ${qty} × ${it.name}` + (pct ? ` and saved ${money((it.price - unit) * qty)}` : '')) + stampMsg);
   }),
   endSale: id => run(async () => { await db.doc('shops/' + id).update({sale: null}); toast('Sale ended'); }),
   deliver: id => run(async () => { const o = S.orders.find(x => x.id === id); await db.doc('orders/' + id).update({status: 'done'}); toast('Marked ' + bizOf(o?.bizType).done.toLowerCase()); }),
@@ -1874,7 +2012,7 @@ const acts = {
       if (S.players[S.me]?.home) fail('Move out of your current home first.');
       if (bal(balances(), S.me, 'c') < x.rent) fail(`You need ${money(x.rent)} in checking to move in.`);
       await addTx(S.me + '.c', 'bank', x.rent, 'rent', `First rent · ${x.name}`);
-      await db.doc('players/' + S.me).update({home: {name: x.name, mode: 'rent', rent: x.rent, price: x.price}});
+      await db.doc('players/' + S.me).update({home: {name: x.name, mode: 'rent', rent: x.rent, price: x.price}, homelessSince: null});
       toast(`Welcome home to your ${x.name}!`);
     });
   },
@@ -1884,7 +2022,7 @@ const acts = {
       if (S.players[S.me]?.home) fail('Move out of your current home first.');
       if (bal(balances(), S.me, 'c') < x.price) fail(`You need ${money(x.price)} in checking. Try a mortgage instead.`);
       await addTx(S.me + '.c', 'bank', x.price, 'home', `Bought the ${x.name}`);
-      await db.doc('players/' + S.me).update({home: {name: x.name, mode: 'own', rent: x.rent, price: x.price}});
+      await db.doc('players/' + S.me).update({home: {name: x.name, mode: 'own', rent: x.rent, price: x.price}, homelessSince: null});
       toast(`You own the ${x.name}!`);
     });
   },
@@ -1899,13 +2037,13 @@ const acts = {
   }),
   moveOut: () => {
     const h = S.players[S.me]?.home; if (!h) return;
-    const body = h.mode === 'rent' ? 'You’ll stop paying rent and need a new place to live.'
+    const body = (h.mode === 'rent' ? 'You’ll stop paying rent and need a new place to live.'
       : h.mode === 'own' ? `The bank buys your home for ${money(h.price)}.`
-      : `The bank buys your home for ${money(h.price)} and keeps ${money(h.balance)} to pay off the mortgage, so you get ${money(h.price - h.balance)}.`;
+      : `The bank buys your home for ${money(h.price)} and keeps ${money(h.balance)} to pay off the mortgage, so you get ${money(h.price - h.balance)}.`);
     confirmIt(h.mode === 'rent' ? 'Move out?' : 'Sell your home?', body, h.mode === 'rent' ? 'Move out' : 'Sell it', async () => {
       if (h.mode === 'own') await addTx('bank', S.me + '.c', h.price, 'home', `Sold the ${h.name}`);
       if (h.mode === 'mortgage') { const net = h.price - h.balance; if (net > 0) await addTx('bank', S.me + '.c', net, 'home', `Sold the ${h.name} and paid off the mortgage`); if (net < 0) await addTx(S.me + '.c', 'bank', -net, 'home', `Sold the ${h.name}; mortgage was more than the price`); }
-      await db.doc('players/' + S.me).update({home: null});
+      await db.doc('players/' + S.me).update({home: null, homelessSince: today()});
       toast('Moved out');
     }, true);
   },
@@ -1940,7 +2078,7 @@ const acts = {
       const down = Math.round(x.price * cfg('downPct') / 100), P = x.price - down;
       if (c < down) fail(`${who} needs ${money(down)} in checking for the down payment.`);
       await addTx(pid + '.c', 'bank', down, 'home', `Down payment on the ${x.name}`);
-      await db.doc('players/' + pid).update({home: {name: x.name, mode: P > 0 ? 'mortgage' : 'own', rent: x.rent, price: x.price, balance: P, rate: cfg('mortgageRate'), payment: mortgagePayment(P, cfg('mortgageRate'), every('mortgageTerm'))}});
+      await db.doc('players/' + pid).update({home: {name: x.name, mode: P > 0 ? 'mortgage' : 'own', rent: x.rent, price: x.price, balance: P, rate: cfg('mortgageRate'), payment: mortgagePayment(P, cfg('mortgageRate'), every('mortgageTerm'))}, homelessSince: null});
     }
     await db.doc('teller/' + id).update({status: 'done', doneDay: today()});
     toast({withdraw: `Handed ${who} ${money(r.amount)} in cash`, deposit: `Deposited ${money(r.amount)} for ${who}`, cd: `CD opened for ${who}`, cdclose: `CD cashed out for ${who}`, mortgage: `Mortgage approved. ${who} has a new home!`}[r.kind]);
@@ -2074,6 +2212,14 @@ const forms = {
     await db.collection('messages').add({from: 'bank', to: g.claimedBy, text: `“${g.title}” isn’t done yet${note ? ': ' + note : ''}. Finish it and tap “I finished” again.`, day: today(), at: Date.now()});
     clear('gr-' + id); toast('Sent back');
   },
+  postRequest: async () => {
+    const title = val('rq-t').trim(), pay = toCents(val('rq-p'));
+    if (!title) fail('Say what you need.'); if (!(pay > 0)) fail('Enter what you’ll pay.');
+    if (bal(balances(), S.me, 'c') < pay) fail(`You need ${money(pay)} in checking. The bank holds it until the job is done.`);
+    await addTx(S.me + '.c', 'bank', pay, 'escrow', `Held for your request: ${title}`);
+    await db.collection('gigs').add({title, pay, kind: 'request', postedBy: S.me, status: 'open', postedDay: today(), at: Date.now()});
+    clear('rq-t', 'rq-p'); toast('Request posted on the Odd jobs board');
+  },
   postGig: async () => {
     const title = val('pg-t').trim(), pay = toCents(val('pg-p')), n = Math.min(5, Math.max(1, parseInt(val('pg-n'), 10) || 1));
     if (!title) fail('Name the job.'); if (!(pay > 0)) fail('Enter the pay.');
@@ -2156,14 +2302,33 @@ const forms = {
     const price = toCents(val('ai-p-' + sid)); if (!(price >= 0)) fail('Enter a price.');
     const st = val('ai-s-' + sid).trim();
     if (bizType(shop) === 'hotel' && !(parseInt(st, 10) > 0)) fail('Set how many rooms of this type.');
+    if (needsStock(shop)) {
+      const qty = Math.max(0, parseInt(st, 10) || 0), cost = qty * unitCost({price});
+      if (shop.ownerId !== 'bank' && cost > 0 && bal(balances(), S.me, 'c') < cost) fail(`${qty} to start would cost ${money(cost)}. Not enough in checking. Try fewer.`);
+      if (cost > 0) await addTx(acctOf(shop.ownerId), 'bank', cost, 'supply', `Stocked ${qty} × ${val('ai-n-' + sid).trim()} for ${shop.name}`, {shopId: sid});
+    }
     await announce(S.me, 'price', `New at ${shop.name}: ${val('ai-n-' + sid).trim()} for ${money(price)}${bizType(shop) === 'hotel' ? ' a night' : ''}.`, {shopId: sid, isNew: true});
     await db.collection('items').add({shopId: sid, name: val('ai-n-' + sid).trim(), price, stock: st === '' ? null : Math.max(0, parseInt(st, 10)), at: Date.now()});
     clear('ai-n-' + sid, 'ai-p-' + sid, 'ai-s-' + sid); toast('Added');
   },
+  restock: async id => {
+    const it = S.items[id], shop = it && S.shops[it.shopId]; if (!it || !shop) fail('That item is gone.');
+    const qty = parseInt(val('rs-' + id), 10); if (!(qty >= 1)) fail('Choose how many to buy.');
+    const src = val('rs-src-' + id), farm = src && src !== 'w' ? S.shops[src] : null;
+    if (farm && (!isOpenBiz(farm) || bizType(farm) !== 'farm')) fail('That farm stand is closed right now. Pick another supplier.');
+    const each = farm ? Math.round(unitCost(it) * (100 - cfg('farmDiscount')) / 100) : unitCost(it), cost = qty * each;
+    if (shop.ownerId !== 'bank' && bal(balances(), shop.ownerId, 'c') < cost) fail(`${qty} × ${it.name} costs ${money(cost)}. Not enough in checking.`);
+    if (farm) {
+      await addTx(acctOf(shop.ownerId), acctOf(farm.ownerId), cost, 'supply', `${shop.name} bought ingredients for ${qty} × ${it.name} from ${farm.name}`, {shopId: shop.id, supplierShopId: farm.id});
+      if (farm.ownerId !== 'bank') await sendMsg('bank', farm.ownerId, `${shop.name} bought ingredients from ${farm.name}: ${money(cost)} is in your checking.`);
+    } else await addTx(acctOf(shop.ownerId), 'bank', cost, 'supply', `Restocked ${qty} × ${it.name} for ${shop.name}`, {shopId: shop.id});
+    await db.doc('items/' + id).update({stock: (it.stock || 0) + qty});
+    clear('rs-' + id); toast(`Restocked ${qty} × ${it.name} for ${money(cost)}${farm ? ' from ' + farm.name : ''}`);
+  },
   editItem: async id => {
     const price = toCents(val('ei-p-' + id)); if (!(price >= 0)) fail('Enter a price.');
     const st = val('ei-s-' + id).trim(), it = S.items[id], shop = it && S.shops[it.shopId];
-    await db.doc('items/' + id).update({price, stock: st === '' ? null : Math.max(0, parseInt(st, 10))});
+    await db.doc('items/' + id).update(shop && needsStock(shop) ? {price} : {price, stock: st === '' ? null : Math.max(0, parseInt(st, 10))});
     if (it && shop && price !== it.price) await announce(S.me, 'price', `Price change at ${shop.name}: ${it.name} ${price > it.price ? 'goes up' : 'drops'} from ${money(it.price)} to ${money(price)}${bizType(shop) === 'hotel' ? ' a night' : ''}.`, {shopId: shop.id, up: price > it.price});
     clear('ei-p-' + id, 'ei-s-' + id); toast('Saved');
   },
@@ -2204,7 +2369,7 @@ const forms = {
     const pin = val('np-pin').trim(); if (pin && !/^\d{4}$/.test(pin)) fail('A PIN needs exactly 4 digits.');
     const wage = toCents(val('np-wage') || '0'), start = toCents(val('np-start') || '0');
     const ref = db.collection('players').doc();
-    await ref.set({name: val('np-name').trim(), job: val('np-job').trim(), wage: wage > 0 ? wage : 0, pin, grade: parseInt(val('np-grade'), 10) || 5, tries: parseInt(val('np-tries'), 10) || 3, createdAt: Date.now()});
+    await ref.set({name: val('np-name').trim(), job: val('np-job').trim(), wage: wage > 0 ? wage : 0, pin, grade: parseInt(val('np-grade'), 10) || 5, tries: parseInt(val('np-tries'), 10) || 3, homelessSince: today(), createdAt: Date.now()});
     if (start > 0) await addTx('bank', ref.id + '.c', start, 'adjust', 'Welcome to town');
     clear('np-name', 'np-job', 'np-wage', 'np-start', 'np-pin', 'np-grade', 'np-tries'); toast('Resident added');
   },
@@ -2226,10 +2391,10 @@ const forms = {
       payEvery: ints('st-payev', 1), billEvery: ints('st-billev', 1), rentEvery: ints('st-rentev', 1), billGrace: ints('st-grace', 0), interestEvery: ints('st-intev', 1),
       taxRate: n('st-tax'), savingsRate: n('st-sav'), loanRate: n('st-loan'), lateFee: c('st-late'), cdRate: n('st-cdr'), cdDays: ints('st-cdd', 1), cdPenalty: Math.min(100, n('st-cdp')),
       mortgageRate: n('st-mr'), mortgageTerm: ints('st-mt', 1), downPct: Math.min(100, n('st-dp')), utilities, homes: homesList,
-      pick3Price: c('st-lp'), lotteryEvery: ints('st-le', 1), pick3Max: Math.min(40, ints('st-lm', 4)), pick3Share: Math.min(100, n('st-ls')), pick3Seed: c('st-lseed'), pick3Boost: c('st-lboost'), pick3Match2: c('st-lm2'), pick3Match1: c('st-lm1'), scratchPrice: c('st-scr'), scratchLimit: ints('st-scrl', 0), gigsPerDay: Math.min(16, ints('st-gigs', 0)), bizCosts: Object.fromEntries(Object.keys(BIZ).map(t => [t, c('bc-' + t)])), bizRules: Object.fromEntries(Object.keys(BIZ).map(t => [t, {inspect: ints('br-i-' + t, 1), license: ints('br-l-' + t, 1)}])), renewPct: Math.min(200, n('st-renew')), bizLimit: Math.min(8, ints('st-bizlim', 1)), stockSwing: Math.min(50, n('st-swing')), marketChance: Math.min(100, n('st-mkt')),
+      pick3Price: c('st-lp'), lotteryEvery: ints('st-le', 1), pick3Max: Math.min(40, ints('st-lm', 4)), pick3Share: Math.min(100, n('st-ls')), pick3Seed: c('st-lseed'), pick3Boost: c('st-lboost'), pick3Match2: c('st-lm2'), pick3Match1: c('st-lm1'), scratchPrice: c('st-scr'), scratchLimit: ints('st-scrl', 0), gigsPerDay: Math.min(16, ints('st-gigs', 0)), bizCosts: Object.fromEntries(Object.keys(BIZ).map(t => [t, c('bc-' + t)])), bizRules: Object.fromEntries(Object.keys(BIZ).map(t => [t, {inspect: ints('br-i-' + t, 1), license: ints('br-l-' + t, 1)}])), renewPct: Math.min(200, n('st-renew')), bizLimit: Math.min(8, ints('st-bizlim', 1)), wholesalePct: Math.min(100, n('st-whole')), stockSwing: Math.min(50, n('st-swing')), marketChance: Math.min(100, n('st-mkt')), profitShare: Math.min(100, n('st-psh')), needsCount: Math.min(4, ints('st-ndn', 0)), needsBonus: c('st-ndb'), needsPenalty: c('st-ndp'), stampReward: c('st-stmp'), farmDiscount: Math.min(90, n('st-farm')), dividendEvery: ints('st-pse', 1),
     });
-    const all = ['st-name','st-sym','st-pin','st-day','st-ev','st-surp','st-aud','st-audf','st-audd','st-audp','st-payev','st-billev','st-rentev','st-grace','st-intev','st-tax','st-sav','st-loan','st-late','st-cdr','st-cdd','st-cdp','st-mr','st-mt','st-dp','st-lp','st-le','st-lm','st-ls','st-lseed','st-lboost','st-lm2','st-lm1','st-scr','st-scrl','st-gigs','st-swing','st-mkt'];
-    Object.keys(BIZ).forEach(t => all.push('bc-' + t, 'br-i-' + t, 'br-l-' + t)); all.push('st-renew', 'st-bizlim');
+    const all = ['st-name','st-sym','st-pin','st-day','st-ev','st-surp','st-aud','st-audf','st-audd','st-audp','st-payev','st-billev','st-rentev','st-grace','st-intev','st-tax','st-sav','st-loan','st-late','st-cdr','st-cdd','st-cdp','st-mr','st-mt','st-dp','st-lp','st-le','st-lm','st-ls','st-lseed','st-lboost','st-lm2','st-lm1','st-scr','st-scrl','st-gigs','st-swing','st-mkt','st-psh','st-pse','st-ndn','st-ndb','st-ndp','st-stmp','st-farm'];
+    Object.keys(BIZ).forEach(t => all.push('bc-' + t, 'br-i-' + t, 'br-l-' + t)); all.push('st-renew', 'st-bizlim', 'st-whole');
     for (let i = 0; i < 4; i++) all.push('ut-n-' + i, 'ut-a-' + i, 'hm-n-' + i, 'hm-r-' + i, 'hm-p-' + i);
     clear(...all); toast('Settings saved');
   },
@@ -2272,7 +2437,7 @@ app.addEventListener('submit', e => {
       for (const c of q.docChanges()) {
         const o = c.doc.data(); if ((o.at || 0) < bootAt) continue;
         const shop = S.shops[o.shopId]?.name || 'your business', T = bizOf(o.bizType);
-        if (c.type === 'added' && o.sellerId === S.me && o.buyerId !== S.me) toast(`New order: ${o.qty} × ${o.itemName} from ${nameOf(o.buyerId)} at ${shop}${o.tip ? ' (+' + money(o.tip) + ' tip)' : ''}`);
+        if (c.type === 'added' && o.sellerId === S.me && o.buyerId !== S.me) toast(`New order: ${o.qty} × ${o.itemName} from ${nameOf(o.buyerId)} at ${shop}${o.tip ? ' (+' + money(o.tip) + ' tip)' : ''}${S.items[o.itemId]?.stock === 0 ? `. ${o.itemName} is now SOLD OUT. Restock it!` : ''}`);
         if (c.type === 'modified' && o.buyerId === S.me && o.status === 'done') toast(`${shop}: your ${o.itemName} ${o.qty > 1 ? 'are' : 'is'} ${T.done.toLowerCase()}!`);
         if (c.type === 'modified' && o.buyerId === S.me && o.status === 'refunded') toast(`${shop} refunded your ${o.itemName}`);
       }
@@ -2287,6 +2452,12 @@ app.addEventListener('submit', e => {
     if (m) { const key = m.to === 'board' ? 'board' : m.from; if (!(S.tab === 'messages' && S.thread === key)) toast(m.to === 'board' ? `New post on the bulletin board from ${contactName(m.from)}` : `New message from ${contactName(m.from)}`); }
     schedule();
   }, onErr);
+  // Auto days: only the device that started the clock advances the day.
+  setInterval(() => {
+    if (!S.settings?.autoOn) return;
+    schedule();
+    if (ls('ptb.autoHost') === '1' && S.settings.autoNextAt && Date.now() >= S.settings.autoNextAt && !S.busy && !S.modal) run(advanceDay);
+  }, 15000);
   render();
 })();
 })();
