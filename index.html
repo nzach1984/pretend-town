@@ -223,14 +223,14 @@ const app = document.getElementById('app');
 let db = null;
 const S = {
   dbState: 'loading', settings: undefined, settingsConfirmed: false,
-  players: {}, tx: [], shops: {}, items: {}, orders: [], loans: {}, bills: [], holdings: [], teller: [], cds: [], messages: [], thread: null, ledgerWho: '', inspecting: null, paperDay: null, picks: [], reveal: null, hotelDay: {}, lottoTickets: [], gigs: [],
+  players: {}, tx: [], shops: {}, items: {}, orders: [], loans: {}, bills: [], holdings: [], teller: [], cds: [], messages: [], thread: null, ledgerWho: '', inspectType: {}, inspectSurprise: false, inspecting: null, paperDay: null, picks: [], reveal: null, hotelDay: {}, lottoTickets: [], gigs: [],
   me: null, tab: null, modal: null, pin: null, toast: null, busy: false, err: null, slow: false,
 };
 const COLORS = ['#2F7D6B','#C0612B','#5B5BB5','#B0457A','#3C7FB0','#8A6D1F','#6C8A2E','#9C4BB3'];
 const DEFAULTS = {day: 1, payEvery: 3, billEvery: 4, billGrace: 2, interestEvery: 7, lateFee: 200, taxRate: 10, savingsRate: 2, loanRate: 5,
   rentEvery: 7, mortgageRate: 2, mortgageTerm: 10, downPct: 20, cdRate: 8, cdDays: 7, cdPenalty: 10, eventChance: 35,
   lotteryPrice: 100, lotteryEvery: 3, lotteryMax: 20, lotteryShare: 50, lotterySeed: 1000, gigsPerDay: 3, stockSwing: 8, surpriseChance: 0, renewPct: 50,
-  pick3Price: 200, pick3Max: 12, pick3Share: 40, pick3Seed: 5000, pick3Match2: 400, pick3Match1: 100, pick3Boost: 1000, scratchPrice: 100, auditChance: 15, auditFine: 300, auditDays: 1, scratchLimit: 5, marketChance: 10, bizLimit: 2};
+  pick3Price: 200, pick3Max: 12, pick3Share: 40, pick3Seed: 5000, pick3Match2: 400, pick3Match1: 100, pick3Boost: 1000, scratchPrice: 100, auditChance: 15, auditFine: 300, auditDays: 1, scratchLimit: 5, marketChance: 10, bizLimit: 2, auditPass: 3};
 const DEFAULT_UTIL = [{name: 'Electric', amount: 800}, {name: 'Water', amount: 500}, {name: 'Internet', amount: 600}];
 const DEFAULT_HOMES = [{name: 'Apartment', rent: 1000, price: 15000}, {name: 'Townhouse', rent: 1600, price: 25000}, {name: 'House with a yard', rent: 2400, price: 40000}];
 const SHARES = 20;
@@ -264,6 +264,16 @@ const bizCost = t => { const v = S.settings?.bizCosts?.[t]; return v == null || 
 const BIZ_RULES = {shop: {inspect: 8, license: 14}, restaurant: {inspect: 4, license: 10}, service: {inspect: 7, license: 14}, entertainment: {inspect: 6, license: 12}, farm: {inspect: 5, license: 12}, doctor: {inspect: 4, license: 10}, repair: {inspect: 7, license: 14}, hotel: {inspect: 6, license: 12}};
 const bizRule = (t, k) => { const v = S.settings?.bizRules?.[t]?.[k]; return v == null || !isFinite(Number(v)) ? (BIZ_RULES[t] || BIZ_RULES.shop)[k] : Math.max(1, Math.round(Number(v))); };
 const CHECKS = ['Clean and tidy', 'Prices posted clearly', 'Friendly service', 'Safe for customers', 'Keeps good sales records'];
+const INSPECTIONS = {
+  general: {name: 'Health & safety', checks: ['Clean and tidy', 'Prices posted clearly', 'Friendly service', 'Safe for customers', 'Keeps good sales records']},
+  food: {name: 'Food safety', checks: ['Hands washed before handling food', 'Food covered and stored properly', 'Clean cooking and serving area', 'Fresh ingredients, nothing expired', 'Allergy information posted']},
+  fire: {name: 'Fire safety', checks: ['Exits and walkways clear', 'No tripping hazards', 'Cords and cables tidy', 'Escape plan posted', 'Nothing blocking the door']},
+  service: {name: 'Customer service', checks: ['Greets every customer', 'Prices posted clearly', 'Gives correct change', 'Polite and patient', 'Serves customers quickly']},
+  records: {name: 'Records & money', checks: ['Every sale written down', 'Stock count matches the list', 'Prices match the price list', 'Receipts kept', 'Cash box neat and counted']},
+  hotel: {name: 'Housekeeping', checks: ['Beds made', 'Clean towels', 'Rooms tidy', 'Front desk prices posted', 'Guest list kept']},
+  medical: {name: 'Medical safety', checks: ['Exam area clean', 'Supplies organized', 'Patient records kept', 'Hands washed between patients', 'Waiting area tidy']},
+};
+const inspTypesFor = t => ({restaurant: ['food', 'general', 'fire', 'service', 'records'], farm: ['food', 'general', 'service', 'records', 'fire'], hotel: ['hotel', 'fire', 'service', 'records', 'general'], doctor: ['medical', 'general', 'fire', 'service', 'records']}[t] || ['general', 'fire', 'service', 'records']);
 const GRADE_CLS = {A: 'good', B: 'note', C: 'warn', D: 'warn', F: 'bad'};
 const GRADE_PRICE = {A: 1.05, B: 1, C: .97, D: .92, F: .8};
 const licExpired = sh => sh.license?.status === 'expired';
@@ -290,20 +300,40 @@ const auditOf = pid => S.players[pid]?.audit;
 const auditPending = pid => auditOf(pid)?.status === 'pending';
 const ownersList = () => playerList().filter(p => Object.values(S.shops).some(sh => sh.ownerId === p.id));
 const AUDIT_N = 5;
+const passMark = () => Math.min(AUDIT_N, Math.max(1, Math.round(cfg('auditPass'))));
+const strikesOf = pid => Number(S.players[pid]?.auditStrikes || 0);
 async function startAudit(pid, day) {
   const lvl = gradeOf(pid), problems = Array.from({length: AUDIT_N}, () => { const [q, raw] = makeProblem(lvl); return {q, a: Math.round(raw * 100) / 100}; });
   const dueDay = day + Math.max(0, Math.round(cfg('auditDays')));
   await db.doc('players/' + pid).update({audit: {status: 'pending', day, dueDay, problems, idx: 0}});
-  await sendMsg('bank', pid, `TAX AUDIT! The Town Tax Office is checking your business records. Open the Tax audit tab and answer ${AUDIT_N} math problems by the end of ${dueDay === day ? 'today' : 'Day ' + dueDay}. You get one chance per problem, and each wrong answer is a ${money(cfg('auditFine'))} fine.`, day);
+  await sendMsg('bank', pid, `TAX AUDIT! The Town Tax Office is checking your business records. Open the Tax audit tab and answer ${AUDIT_N} math problems by the end of ${dueDay === day ? 'today' : 'Day ' + dueDay}. One chance per problem, and each wrong answer is a ${money(cfg('auditFine'))} fine. Get at least ${passMark()} right to pass. Fail 2 audits and the town takes one of your businesses.${strikesOf(pid) ? ' You already have 1 strike!' : ''}`, day);
 }
 async function finishAudit(pid, audit, day) {
   const problems = audit.problems.map(p => ({...p, ok: !!p.ok, given: p.given ?? null}));
-  const wrong = problems.filter(p => !p.ok).length, fine = wrong * cfg('auditFine'), name = nameOf(pid);
+  const wrong = problems.filter(p => !p.ok).length, correct = AUDIT_N - wrong, fine = wrong * cfg('auditFine'), name = nameOf(pid);
+  const failed = correct < passMark(), status = wrong === 0 ? 'passed' : failed ? 'failed' : 'fined';
   if (fine > 0) await addBill(pid, 'fine', 'Tax audit fine', [{name: `Tax audit: ${wrong} wrong answer${wrong > 1 ? 's' : ''}`, amount: fine}], day);
-  const done = {...audit, problems, status: wrong ? 'failed' : 'passed', wrong, fine, doneDay: day};
-  await db.doc('players/' + pid).update({audit: done, auditHistory: [{day: audit.day, wrong, fine}, ...(S.players[pid]?.auditHistory || [])].slice(0, 6)});
-  await sendMsg('bank', pid, wrong ? `Your tax audit is done: ${AUDIT_N - wrong} of ${AUDIT_N} correct. Fine: ${money(fine)}. It’s in your Bills tab.` : `Clean audit! All ${AUDIT_N} correct. The Tax Office has no complaints.`, day);
-  const item = wrong ? {day, title: 'Tax office fines a business owner', text: `A local business owner got ${wrong} of ${AUDIT_N} audit questions wrong and was fined ${money(fine)}. We won’t say who.`} : {day, title: `${name} passes a tax audit`, text: `${name} answered all ${AUDIT_N} questions from the Town Tax Office correctly. Clean books!`};
+  let strikes = strikesOf(pid) + (failed ? 1 : 0), lost = null;
+  if (failed && strikes >= 2) {
+    const owned = Object.values(S.shops).filter(sh => sh.ownerId === pid).sort((a, b) => revenue(a.id, day) - revenue(b.id, day));
+    if (owned.length) {
+      lost = owned[0];
+      for (const o of S.orders.filter(o => o.shopId === lost.id && o.status === 'new')) await db.doc('orders/' + o.id).update({sellerId: 'bank'});
+      await db.doc('shops/' + lost.id).update({ownerId: 'bank', prevOwner: pid, foreclosedDay: day, seizedFor: 'audit', sale: null, renewalRequested: null});
+    }
+    strikes = 0;
+  }
+  const done = {...audit, problems, status, wrong, fine, strike: failed ? (lost ? 2 : strikes) : 0, lostShop: lost?.name || null, doneDay: day};
+  await db.doc('players/' + pid).update({audit: done, auditStrikes: strikes, auditHistory: [{day: audit.day, wrong, fine, status}, ...(S.players[pid]?.auditHistory || [])].slice(0, 6)});
+  const msg = lost ? `You failed a second tax audit (${correct} of ${AUDIT_N} right). The town has taken ${lost.name}. Fine: ${money(fine)}. Your strikes are reset to zero.`
+    : failed ? `You failed the tax audit: ${correct} of ${AUDIT_N} right. Fine: ${money(fine)}. That’s strike 1 of 2. Fail one more and the town takes one of your businesses!`
+    : wrong ? `You passed the tax audit with ${correct} of ${AUDIT_N} right. Fine for the mistakes: ${money(fine)}.`
+    : `Clean audit! All ${AUDIT_N} correct. The Tax Office has no complaints.`;
+  await sendMsg('bank', pid, msg, day);
+  const item = lost ? {day, title: `Tax office takes ${lost.name}`, text: `${name} failed two tax audits, so the town took over ${lost.name}. The bank will run it until it’s sold.`}
+    : failed ? {day, title: 'Business owner fails a tax audit', text: `A local business owner got only ${correct} of ${AUDIT_N} audit questions right and was fined ${money(fine)}. One more failed audit and they lose a business.`}
+    : wrong ? {day, title: 'Tax office fines a business owner', text: `A local business owner passed an audit but missed ${wrong} question${wrong > 1 ? 's' : ''}, for a ${money(fine)} fine.`}
+    : {day, title: `${name} passes a tax audit`, text: `${name} answered all ${AUDIT_N} questions from the Town Tax Office correctly. Clean books!`};
   await db.doc('town/settings').update({news: [item, ...(S.settings.news || [])].slice(0, 12)});
   return wrong;
 }
@@ -1060,13 +1090,15 @@ function auditView() {
   const done = a.problems.filter(p => p.given != null), cur = a.problems[a.idx];
   const rows = done.map((p, i) => `<div class="li"><span class="badge" style="${p.ok ? 'color:var(--good)' : 'color:var(--bad)'}">${p.ok ? '✓' : '✗'}</span><div class="main"><b>${esc(p.q)}</b><small>You said ${esc(String(p.given))}${p.ok ? '' : ' · correct answer: ' + p.a}</small></div></div>`).join('');
   return `<div class="cols"><div class="stack">
-    <section class="panel"><div class="panel-head"><div><p class="eyebrow">Town Tax Office</p><h2>Surprise tax audit</h2></div><span class="pill ${a.status === 'pending' ? 'warn' : a.status === 'passed' ? 'good' : 'bad'}">${a.status === 'pending' ? `Question ${Math.min(a.idx + 1, AUDIT_N)} of ${AUDIT_N}` : a.status === 'passed' ? 'Clean audit' : 'Fined'}</span></div>
+    <section class="panel"><div class="panel-head"><div><p class="eyebrow">Town Tax Office</p><h2>Surprise tax audit</h2></div><span class="pill ${a.status === 'pending' ? 'warn' : a.status === 'passed' ? 'good' : a.status === 'fined' ? 'warn' : 'bad'}">${a.status === 'pending' ? `Question ${Math.min(a.idx + 1, AUDIT_N)} of ${AUDIT_N}` : a.status === 'passed' ? 'Clean audit' : a.status === 'fined' ? 'Passed, fined' : 'Failed'}</span></div>
+      <p class="muted" style="font-size:.88rem">Pass by getting at least ${passMark()} of ${AUDIT_N} right. Strikes: <b class="${strikesOf(pid) ? 'neg' : ''}">${strikesOf(pid)} of 2</b>. Two failed audits and the town takes one of your businesses.</p>
       ${a.status === 'pending' && cur ? `<p class="muted">Due by the end of ${a.dueDay === today() ? 'today' : 'Day ' + a.dueDay}. You get one chance per problem. Each wrong answer is a ${money(cfg('auditFine'))} fine.</p>
         <p class="problem">${esc(cur.q)}</p>
         <form class="inline" data-form="auditAnswer"><label>Your answer<input id="au-ans" inputmode="decimal" required autocomplete="off"></label><button class="btn gold">Submit answer</button></form>` : ''}
-      ${a.status !== 'pending' ? `<p>${a.wrong ? `You got ${AUDIT_N - a.wrong} of ${AUDIT_N} right. Fine: <b>${money(a.fine)}</b>, sent to your Bills tab.` : `All ${AUDIT_N} right. The Tax Office is impressed!`}</p>` : ''}
+      ${a.status !== 'pending' ? `<p>${a.wrong ? `You got ${AUDIT_N - a.wrong} of ${AUDIT_N} right. Fine: <b>${money(a.fine)}</b>, sent to your Bills tab.` : `All ${AUDIT_N} right. The Tax Office is impressed!`}</p>
+        ${a.lostShop ? `<div class="alert bad"><span><b>Second failed audit.</b> The town took ${esc(a.lostShop)}.</span></div>` : a.status === 'failed' ? `<div class="alert bad"><span><b>Strike 1 of 2.</b> Fail one more audit and the town takes one of your businesses.</span></div>` : ''}` : ''}
       ${rows ? `<div class="list">${rows}</div>` : ''}</section>
-  </div><div class="stack"><section class="panel"><h3>What’s a tax audit?</h3><p class="muted">Business owners have to keep careful records and pay the right taxes. Sometimes the tax office checks those records to make sure the math adds up. Careful math means no fines.</p></section></div></div>`;
+  </div><div class="stack"><section class="panel"><h3>What’s a tax audit?</h3><p class="muted">Business owners have to keep careful records and pay the right taxes. Sometimes the tax office checks those records to make sure the math adds up. Careful math means no fines. Fail two audits and you lose a business, the one with the lowest sales.</p></section></div></div>`;
 }
 
 function jobsView() {
@@ -1269,23 +1301,26 @@ function inspectorView() {
         <div class="row" style="gap:6px">${g ? `<span class="pill ${GRADE_CLS[g]}">Grade ${g}</span>` : '<span class="pill mute">No grade</span>'}${isOpenBiz(sh) ? '<span class="pill good">Open</span>' : '<span class="pill bad">Closed</span>'}</div></div>
       <div class="list">
         <div class="li"><span class="badge">LIC</span><div class="main"><b>${!sh.license ? 'License set up on the next day' : licExpired(sh) ? 'License expired' : 'Licensed through Day ' + sh.license.expiresDay}</b><small>${bizRule(t, 'license')}-day licenses · renewal ${money(renewFee(t))}</small></div>${licExpired(sh) ? '<span class="pill bad">Expired</span>' : ''}</div>
-        <div class="li"><span class="badge">INS</span><div class="main"><b>${sh.inspection?.nextDue != null ? (inspOverdue(sh) ? 'Overdue since Day ' + sh.inspection.nextDue : 'Due ' + dayIn(sh.inspection.nextDue)) : 'Schedule starts next day'}</b><small>Every ${bizRule(t, 'inspect')} days${sh.inspection?.day ? ' · last Day ' + sh.inspection.day : ''}${sh.inspection?.notes ? ' · ' + esc(sh.inspection.notes) : ''}</small></div>${inspOverdue(sh) ? '<span class="pill bad">Overdue</span>' : sh.inspection?.nextDue === today() ? '<span class="pill warn">Today</span>' : ''}</div></div>
+        <div class="li"><span class="badge">INS</span><div class="main"><b>${sh.inspection?.nextDue != null ? (inspOverdue(sh) ? 'Overdue since Day ' + sh.inspection.nextDue : 'Due ' + dayIn(sh.inspection.nextDue)) : 'Schedule starts next day'}</b><small>Every ${bizRule(t, 'inspect')} days${sh.inspection?.day ? ' · last Day ' + sh.inspection.day + (sh.inspection.kindName ? ' (' + esc(sh.inspection.kindName) + (sh.inspection.surprise ? ', surprise' : '') + ')' : '') : ''}${sh.inspection?.notes ? ' · ' + esc(sh.inspection.notes) : ''}</small></div>${inspOverdue(sh) ? '<span class="pill bad">Overdue</span>' : sh.inspection?.nextDue === today() ? '<span class="pill warn">Today</span>' : ''}</div></div>
       ${sh.renewalRequested ? `<div class="alert"><span><b>${esc(nameOf(sh.ownerId))} asked to renew the license</b> on Day ${sh.renewalRequested} · fee ${money(renewFee(t))} from their checking</span><span class="row"><button class="btn sm" data-act="approveRenew" data-id="${sh.id}">Approve</button><button class="btn ghost sm" data-act="denyRenew" data-id="${sh.id}">Deny</button></span></div>` : ''}
-      <div><button class="btn ${open ? 'ghost' : 'gold'} sm" data-act="inspectOpen" data-id="${sh.id}">${open ? 'Cancel' : 'Inspect now'}</button></div>
-      ${open ? `<form data-form="inspect" data-id="${sh.id}" style="border-top:1px solid var(--line);padding-top:12px">
-        <p class="eyebrow">Inspection checklist</p>
-        ${CHECKS.map((c, i) => `<label style="display:flex;gap:10px;align-items:center;color:var(--ink);font-size:1rem"><input type="checkbox" id="ic-${sh.id}-${i}" style="width:auto;min-height:0;transform:scale(1.3)"> ${c}</label>`).join('')}
+      <div class="row">${open ? `<button class="btn ghost sm" data-act="inspectOpen" data-id="${sh.id}">Cancel</button>` : `<button class="btn gold sm" data-act="inspectOpen" data-id="${sh.id}">Inspect now</button><button class="btn danger sm" data-act="inspectSurprise" data-id="${sh.id}">Surprise inspection</button>`}</div>
+      ${open ? (() => { const types = inspTypesFor(t), kind = types.includes(S.inspectType[sh.id]) ? S.inspectType[sh.id] : types[0], K = INSPECTIONS[kind]; return `<form data-form="inspect" data-id="${sh.id}" style="border-top:1px solid var(--line);padding-top:12px">
+        ${S.inspectSurprise ? '<div class="alert bad"><span><b>Surprise inspection.</b> The owner wasn’t warned. Their regular schedule stays the same unless they fail.</span></div>' : ''}
+        <p class="eyebrow">Kind of inspection</p>
+        <div class="row" style="gap:6px">${types.map(k => `<button type="button" class="btn ${k === kind ? '' : 'ghost'} sm" data-act="inspectKind" data-id="${sh.id}:${k}">${INSPECTIONS[k].name}</button>`).join('')}</div>
+        <p class="eyebrow">${K.name} checklist</p>
+        ${K.checks.map((c, i) => `<label style="display:flex;gap:10px;align-items:center;color:var(--ink);font-size:1rem"><input type="checkbox" id="ic-${sh.id}-${kind}-${i}" style="width:auto;min-height:0;transform:scale(1.3)"> ${c}</label>`).join('')}
         <p class="muted" style="font-size:.85rem">5 checks = A, 4 = B, 3 = C, 2 = D, 1 or 0 = F. A D or F shuts the business down and makes the news. It reopens only after earning a C or better on re-inspection in 2 days.</p>
         <div class="fields"><label>Grade<select id="ig-${sh.id}"><option value="auto">Use the checklist</option>${['A', 'B', 'C', 'D', 'F'].map(x => `<option value="${x}">${x}</option>`).join('')}</select></label>
           <label>Notes for the owner<input id="in-${sh.id}" maxlength="120" placeholder="Prices were hard to read"></label></div>
-        <div><button class="btn">Save inspection</button></div></form>` : ''}</section>`;
+        <div><button class="btn">Save ${S.inspectSurprise ? 'surprise ' : ''}${K.name.toLowerCase()} inspection</button></div></form>`; })() : ''}</section>`;
   };
   return `<div><p class="eyebrow">Business inspector · Day ${today()}</p><h2>Licenses & inspections</h2></div>
     <div class="stats"><div class="stat"><b>${renew}</b><span>Renewals waiting</span></div><div class="stat"><b>${overdue + dueToday}</b><span>Inspections due or overdue</span></div><div class="stat"><b>${expired}</b><span>Expired licenses</span></div><div class="stat"><b>${shops.filter(failedInsp).length}</b><span>Shut down (D or F)</span></div></div>
     <div class="cols"><div class="stack">${list.length ? list.map(card).join('') : '<div class="empty">No businesses yet.</div>'}</div>
-    <div class="stack"><section class="panel"><h3>Tax audits</h3><p class="muted" style="font-size:.88rem">A business owner answers ${AUDIT_N} math problems at their grade level, one chance each. Each wrong answer is a ${money(cfg('auditFine'))} fine. There’s a ${Math.round(cfg('auditChance'))}% chance of a surprise audit each new day.</p>
+    <div class="stack"><section class="panel"><h3>Tax audits</h3><p class="muted" style="font-size:.88rem">A business owner answers ${AUDIT_N} math problems at their grade level, one chance each. Each wrong answer is a ${money(cfg('auditFine'))} fine. Fewer than ${passMark()} right is a failed audit, and a second failed audit costs them their lowest-selling business. There’s a ${Math.round(cfg('auditChance'))}% chance of a surprise audit each new day.</p>
       ${ownersList().length ? `<form class="inline" data-form="startAudit"><label>Audit<select id="au-who"><option value="random">A random business owner</option>${ownersList().filter(p => !auditPending(p.id)).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label><button class="btn danger">Start audit</button></form>` : '<p class="muted">Nobody owns a business yet.</p>'}
-      <div class="list">${playerList().filter(p => auditOf(p.id)).map(p => { const a = auditOf(p.id); return `<div class="li"><div class="main"><b>${esc(p.name)}</b><small>Audit from Day ${a.day}${a.status === 'pending' ? ` · ${a.idx} of ${AUDIT_N} answered · due Day ${a.dueDay}` : ` · ${AUDIT_N - (a.wrong || 0)} of ${AUDIT_N} right`}</small></div><span class="pill ${a.status === 'pending' ? 'warn' : a.status === 'passed' ? 'good' : 'bad'}">${a.status === 'pending' ? 'In progress' : a.status === 'passed' ? 'Clean' : 'Fined ' + money(a.fine)}</span></div>`; }).join('')}</div></section>
+      <div class="list">${playerList().filter(p => auditOf(p.id)).map(p => { const a = auditOf(p.id); return `<div class="li"><div class="main"><b>${esc(p.name)}</b><small>Audit from Day ${a.day}${a.status === 'pending' ? ` · ${a.idx} of ${AUDIT_N} answered · due Day ${a.dueDay}` : ` · ${AUDIT_N - (a.wrong || 0)} of ${AUDIT_N} right`}</small></div><span class="pill ${a.status === 'pending' ? 'warn' : a.status === 'passed' ? 'good' : a.status === 'fined' ? 'warn' : 'bad'}">${a.status === 'pending' ? 'In progress' : a.status === 'passed' ? 'Clean' : a.status === 'fined' ? 'Passed, fined ' + money(a.fine) : a.lostShop ? 'Lost ' + esc(a.lostShop) : 'Failed · strike ' + strikesOf(p.id)}</span></div>`; }).join('')}</div></section>
     <section class="panel"><h3>Schedules by business type</h3><div class="tbl-wrap"><table><thead><tr><th>Type</th><th class="r">Inspect every</th><th class="r">License lasts</th><th class="r">Renewal</th></tr></thead><tbody>
       ${Object.keys(BIZ).map(t => `<tr><td>${BIZ[t].Noun}</td><td class="r">${bizRule(t, 'inspect')} days</td><td class="r">${bizRule(t, 'license')} days</td><td class="r num">${money(renewFee(t))}</td></tr>`).join('')}</tbody></table></div>
       <p class="muted" style="font-size:.85rem">Change these in Settings. Owners get a message when an inspection is due and when a license is about to run out.</p></section>
@@ -1325,7 +1360,8 @@ function manageBiz(shop) {
             ${shop.renewalRequested ? '<span class="pill warn">Renewal waiting</span>' : `<button class="btn ${licExpired(shop) ? 'gold' : 'ghost'} sm" data-act="askRenew" data-id="${sid}">Renew</button>`}</div>
           <div class="li"><span class="badge">INS</span><div class="main"><b>${shop.inspection?.nextDue != null ? (inspOverdue(shop) ? 'Inspection overdue since Day ' + shop.inspection.nextDue : 'Next inspection ' + dayIn(shop.inspection.nextDue)) : 'First inspection is scheduled tomorrow'}</b><small>Inspected every ${bizRule(t, 'inspect')} days${shop.inspection?.day ? ' · last on Day ' + shop.inspection.day : ''}</small></div></div></div>
         ${shop.inspection?.notes ? `<p class="muted" style="font-size:.88rem">Inspector’s notes: ${esc(shop.inspection.notes)}</p>` : ''}
-        <p class="muted" style="font-size:.85rem">The inspector checks: ${CHECKS.join(', ').toLowerCase()}. Better grades make your share price go up. A D or F shuts you down and puts you in the newspaper.</p></section>`}
+        ${shop.inspection?.kindName ? `<p style="font-size:.9rem">Last inspection: <b>${esc(shop.inspection.kindName)}</b>${shop.inspection.surprise ? ' (surprise)' : ''} on Day ${shop.inspection.day} · Grade ${shop.inspection.grade}${shop.inspection.missed?.length ? ' · needs work: ' + esc(shop.inspection.missed.join(', ').toLowerCase()) : ' · perfect score'}</p>` : ''}
+        <p class="muted" style="font-size:.85rem">Inspections you could get: ${inspTypesFor(t).map(k => INSPECTIONS[k].name.toLowerCase()).join(', ')}. The inspector can also show up by surprise at any time. Better grades raise your share price. A D or F shuts you down and puts you in the newspaper.</p></section>`}
       <section class="panel"><div class="panel-head"><h3>Sales & promotions</h3>${pct ? `<span class="pill bad">${pct}% off · ${saleWhen(shop)}</span>` : ''}</div>
         ${pct ? `<p class="muted">Everything is ${pct}% off on Main Street ${saleWhen(shop)}.</p><div><button class="btn ghost sm" data-act="endSale" data-id="${sid}">End the sale</button></div>`
         : `<p class="muted">Run a sale to bring in customers. Everything on your ${T.list.toLowerCase()} gets cheaper and Main Street shows it off.</p>
@@ -1357,7 +1393,7 @@ function bankView() {
   if (S.tab === 'inspector') return inspectorView();
   if (S.tab === 'hotel') {
     const h = bankHotel(), owned = Object.values(S.shops).filter(x => x.ownerId === 'bank' && x !== h);
-    const sellForm = sh => { const t = bizType(sh), buyers = playerList().filter(p => bizCount(p.id) < bizLimit() && !Object.values(S.shops).some(x => x.ownerId === p.id && bizType(x) === t)); return `<section class="panel"><h3>Sell ${esc(sh.name)}</h3><p class="muted" style="font-size:.88rem">Foreclosed from ${esc(nameOf(sh.prevOwner))} on Day ${sh.foreclosedDay}. The buyer pays from checking and gets a fresh license.</p>${buyers.length ? `<form class="inline" data-form="sellBiz" data-id="${sh.id}"><label>Buyer<select id="sb-who-${sh.id}" required><option value="">Choose…</option>${buyers.map(p => `<option value="${p.id}">${esc(p.name)} · ${money(bal(balances(), p.id, 'c'))} in checking</option>`).join('')}</select></label><label>Price<input id="sb-p-${sh.id}" inputmode="decimal" value="${(bizValue(sh) / 100).toFixed(2)}"></label><button class="btn">Sell</button></form>` : '<p class="muted">Every resident already owns this kind of business.</p>'}</section>`; };
+    const sellForm = sh => { const t = bizType(sh), buyers = playerList().filter(p => bizCount(p.id) < bizLimit() && !Object.values(S.shops).some(x => x.ownerId === p.id && bizType(x) === t)); return `<section class="panel"><h3>Sell ${esc(sh.name)}</h3><p class="muted" style="font-size:.88rem">${sh.seizedFor === 'audit' ? 'Taken after two failed tax audits' : 'Foreclosed'} from ${esc(nameOf(sh.prevOwner))} on Day ${sh.foreclosedDay}. The buyer pays from checking and gets a fresh license.</p>${buyers.length ? `<form class="inline" data-form="sellBiz" data-id="${sh.id}"><label>Buyer<select id="sb-who-${sh.id}" required><option value="">Choose…</option>${buyers.map(p => `<option value="${p.id}">${esc(p.name)} · ${money(bal(balances(), p.id, 'c'))} in checking</option>`).join('')}</select></label><label>Price<input id="sb-p-${sh.id}" inputmode="decimal" value="${(bizValue(sh) / 100).toFixed(2)}"></label><button class="btn">Sell</button></form>` : '<p class="muted">Every resident already owns this kind of business.</p>'}</section>`; };
     return (h ? manageBiz(h) : `<section class="panel" style="max-width:640px"><h2>Open the town hotel</h2><p class="muted">The hotel belongs to the town. Kids book rooms on Main Street and tourists fill some rooms each night. All of that money goes to the bank. Kids can still buy shares in it.</p><form data-form="openHotel"><label>Hotel name<input id="oh-n" required maxlength="40" placeholder="Grand Pine Hotel"></label><label>Description<input id="oh-d" maxlength="100" placeholder="Cozy rooms, a pool and free breakfast"></label><div><button class="btn">Open the hotel</button></div></form></section>`) + owned.map(sh => `<hr style="border:0;border-top:2px dashed var(--line);margin:8px 0;width:100%">${sellForm(sh)}${manageBiz(sh)}`).join('');
   }
   const b = balances(), ps = playerList();
@@ -1519,6 +1555,7 @@ function bankView() {
         <label>Chance of a town event each day (%)<input id="st-ev" type="number" min="0" max="100" value="${Math.round(cfg('eventChance'))}"></label>
         <label>Chance of a surprise tax audit each day (%)<input id="st-aud" type="number" min="0" max="100" value="${Math.round(cfg('auditChance'))}"></label>
         <label>Fine per wrong audit answer<input id="st-audf" inputmode="decimal" value="${(cfg('auditFine') / 100).toFixed(2)}"></label>
+        <label>Audit answers needed to pass (of 5)<input id="st-audp" type="number" min="1" max="5" value="${passMark()}"></label>
         <label>Days to finish an audit<input id="st-audd" type="number" min="0" value="${Math.round(cfg('auditDays'))}"></label>
         <label>Chance of a surprise bill each day (%)<input id="st-surp" type="number" min="0" max="100" value="${Math.round(cfg('surpriseChance'))}"></label></div></section>
       <section class="panel"><h3>Schedule</h3><div class="fields">
@@ -1653,7 +1690,9 @@ const acts = {
     await sendMsg('bank', sh.ownerId, `The license renewal for ${sh.name} was not approved. Talk to the inspector.`);
     toast('Renewal denied');
   }),
-  inspectOpen: id => { S.inspecting = S.inspecting === id ? null : id; render(); },
+  inspectOpen: id => { S.inspecting = S.inspecting === id ? null : id; S.inspectSurprise = false; render(); },
+  inspectSurprise: id => { S.inspecting = id; S.inspectSurprise = true; render(); },
+  inspectKind: key => { const [sid, k] = key.split(':'); S.inspectType = {...S.inspectType, [sid]: k}; render(); },
   pickNight: key => { const [sid, d] = key.split(':'); S.hotelDay = {...(S.hotelDay || {}), [sid]: Number(d)}; render(); },
   pickNum: n => { n = Number(n); const p = S.picks || []; S.picks = p.includes(n) ? p.filter(x => x !== n) : p.length >= 3 ? p : [...p, n].sort((a, b) => a - b); render(); },
   quickPick: () => { const max = Math.max(4, every('pick3Max')); S.picks = Array.from({length: max}, (_, i) => i + 1).sort(() => Math.random() - .5).slice(0, 3).sort((a, b) => a - b); render(); },
@@ -1931,21 +1970,23 @@ const forms = {
   },
   inspect: async id => {
     const sh = S.shops[id]; if (!sh) fail('That business closed.');
-    const checks = CHECKS.map((_, i) => !!document.getElementById(`ic-${id}-${i}`)?.checked), passed = checks.filter(Boolean).length;
+    const t = bizType(sh), types = inspTypesFor(t), kind = types.includes(S.inspectType[id]) ? S.inspectType[id] : types[0], K = INSPECTIONS[kind], surprise = !!S.inspectSurprise;
+    const checks = K.checks.map((_, i) => !!document.getElementById(`ic-${id}-${kind}-${i}`)?.checked), passed = checks.filter(Boolean).length;
     const pick = val('ig-' + id), grade = pick && pick !== 'auto' ? pick : ['F', 'F', 'D', 'C', 'B', 'A'][passed];
     const failed = FAIL_GRADES.includes(grade), wasClosed = failedInsp(sh);
-    const notes = val('in-' + id).trim(), t = bizType(sh), nextDue = today() + (failed ? 2 : bizRule(t, 'inspect'));
-    await db.doc('shops/' + id).update({inspection: {grade, day: today(), nextDue, notes, checks}, suspended: failed});
-    if (failed || wasClosed) {
-      const item = failed
-        ? {day: today(), title: `${sh.name} shut down`, text: `${sh.name}, owned by ${nameOf(sh.ownerId)}, failed its inspection with a ${grade} and is closed. It can’t reopen until it earns a C or better on re-inspection.`}
-        : {day: today(), title: `${sh.name} reopens`, text: `${sh.name} passed its re-inspection with a ${grade} and is open for business again.`};
-      await db.doc('town/settings').update({news: [item, ...(S.settings.news || [])].slice(0, 12)});
-    }
-    const missed = CHECKS.filter((_, i) => !checks[i]);
-    await sendMsg('bank', sh.ownerId, `Inspection at ${sh.name}: Grade ${grade}.${missed.length ? ' Needs work: ' + missed.join(', ').toLowerCase() + '.' : ' Perfect score!'}${notes ? ' Notes: ' + notes : ''}${failed ? ' The business is shut down until it earns a C or better. Re-inspection on Day ' + nextDue + '. This made the news.' : (wasClosed ? ' You passed, so you’re open again! Next inspection by Day ' + nextDue + '.' : ' Next inspection by Day ' + nextDue + '.')}`);
-    S.inspecting = null; clear('in-' + id, 'ig-' + id, ...CHECKS.map((_, i) => `ic-${id}-${i}`));
-    toast(`${sh.name} got a${grade === 'A' || grade === 'F' ? 'n' : ''} ${grade}${failed ? ', is shut down, and made the news' : wasClosed ? ' and is open again' : ''}`);
+    const notes = val('in-' + id).trim();
+    const nextDue = failed ? today() + 2 : surprise && sh.inspection?.nextDue != null && sh.inspection.nextDue >= today() ? sh.inspection.nextDue : today() + bizRule(t, 'inspect');
+    const missed = K.checks.filter((_, i) => !checks[i]);
+    await db.doc('shops/' + id).update({inspection: {grade, day: today(), nextDue, notes, checks, kind, kindName: K.name, surprise, missed}, suspended: failed});
+    const label = `${surprise ? 'surprise ' : ''}${K.name.toLowerCase()} inspection`;
+    let item = null;
+    if (failed) item = {day: today(), title: `${sh.name} shut down`, text: `${sh.name}, owned by ${nameOf(sh.ownerId)}, failed a ${label} with a ${grade} and is closed. It can’t reopen until it earns a C or better on re-inspection.`};
+    else if (wasClosed) item = {day: today(), title: `${sh.name} reopens`, text: `${sh.name} passed its re-inspection (${K.name.toLowerCase()}) with a ${grade} and is open for business again.`};
+    else if (surprise) item = {day: today(), title: `Surprise inspection at ${sh.name}`, text: `The town inspector dropped by ${sh.name} unannounced for a ${K.name.toLowerCase()} check. Result: a${grade === 'A' ? 'n' : ''} ${grade}.`};
+    if (item) await db.doc('town/settings').update({news: [item, ...(S.settings.news || [])].slice(0, 12)});
+    await sendMsg('bank', sh.ownerId, `${surprise ? 'SURPRISE! ' : ''}${K.name} inspection at ${sh.name}: Grade ${grade}.${missed.length ? ' Needs work: ' + missed.join(', ').toLowerCase() + '.' : ' Perfect score!'}${notes ? ' Notes: ' + notes : ''}${failed ? ' The business is shut down until it earns a C or better. Re-inspection on Day ' + nextDue + '. This made the news.' : (wasClosed ? ' You passed, so you’re open again! Next inspection by Day ' + nextDue + '.' : ' Next regular inspection by Day ' + nextDue + '.')}`);
+    S.inspecting = null; S.inspectSurprise = false; clear('in-' + id, 'ig-' + id, ...K.checks.map((_, i) => `ic-${id}-${kind}-${i}`));
+    toast(`${sh.name} got a${grade === 'A' || grade === 'F' ? 'n' : ''} ${grade}${failed ? ', is shut down, and made the news' : wasClosed ? ' and is open again' : surprise ? ' on a surprise inspection' : ''}`);
   },
   story: async () => {
     const h = val('ps-h').trim(), t = val('ps-t').trim();
@@ -2181,13 +2222,13 @@ const forms = {
     const utilities = [0, 1, 2, 3].map(i => ({name: val('ut-n-' + i).trim(), amount: c('ut-a-' + i)})).filter(u => u.name && u.amount > 0);
     const homesList = [0, 1, 2, 3].map(i => ({name: val('hm-n-' + i).trim(), rent: c('hm-r-' + i), price: c('hm-p-' + i)})).filter(h => h.name && h.price > 0);
     await db.doc('town/settings').update({
-      name: val('st-name').trim(), symbol: val('st-sym').trim() || '$', bankerPin: pin, day: ints('st-day', 1), eventChance: Math.min(100, n('st-ev')), surpriseChance: Math.min(100, n('st-surp')), auditChance: Math.min(100, n('st-aud')), auditFine: c('st-audf'), auditDays: ints('st-audd', 0),
+      name: val('st-name').trim(), symbol: val('st-sym').trim() || '$', bankerPin: pin, day: ints('st-day', 1), eventChance: Math.min(100, n('st-ev')), surpriseChance: Math.min(100, n('st-surp')), auditChance: Math.min(100, n('st-aud')), auditFine: c('st-audf'), auditDays: ints('st-audd', 0), auditPass: Math.min(5, ints('st-audp', 1)),
       payEvery: ints('st-payev', 1), billEvery: ints('st-billev', 1), rentEvery: ints('st-rentev', 1), billGrace: ints('st-grace', 0), interestEvery: ints('st-intev', 1),
       taxRate: n('st-tax'), savingsRate: n('st-sav'), loanRate: n('st-loan'), lateFee: c('st-late'), cdRate: n('st-cdr'), cdDays: ints('st-cdd', 1), cdPenalty: Math.min(100, n('st-cdp')),
       mortgageRate: n('st-mr'), mortgageTerm: ints('st-mt', 1), downPct: Math.min(100, n('st-dp')), utilities, homes: homesList,
       pick3Price: c('st-lp'), lotteryEvery: ints('st-le', 1), pick3Max: Math.min(40, ints('st-lm', 4)), pick3Share: Math.min(100, n('st-ls')), pick3Seed: c('st-lseed'), pick3Boost: c('st-lboost'), pick3Match2: c('st-lm2'), pick3Match1: c('st-lm1'), scratchPrice: c('st-scr'), scratchLimit: ints('st-scrl', 0), gigsPerDay: Math.min(16, ints('st-gigs', 0)), bizCosts: Object.fromEntries(Object.keys(BIZ).map(t => [t, c('bc-' + t)])), bizRules: Object.fromEntries(Object.keys(BIZ).map(t => [t, {inspect: ints('br-i-' + t, 1), license: ints('br-l-' + t, 1)}])), renewPct: Math.min(200, n('st-renew')), bizLimit: Math.min(8, ints('st-bizlim', 1)), stockSwing: Math.min(50, n('st-swing')), marketChance: Math.min(100, n('st-mkt')),
     });
-    const all = ['st-name','st-sym','st-pin','st-day','st-ev','st-surp','st-aud','st-audf','st-audd','st-payev','st-billev','st-rentev','st-grace','st-intev','st-tax','st-sav','st-loan','st-late','st-cdr','st-cdd','st-cdp','st-mr','st-mt','st-dp','st-lp','st-le','st-lm','st-ls','st-lseed','st-lboost','st-lm2','st-lm1','st-scr','st-scrl','st-gigs','st-swing','st-mkt'];
+    const all = ['st-name','st-sym','st-pin','st-day','st-ev','st-surp','st-aud','st-audf','st-audd','st-audp','st-payev','st-billev','st-rentev','st-grace','st-intev','st-tax','st-sav','st-loan','st-late','st-cdr','st-cdd','st-cdp','st-mr','st-mt','st-dp','st-lp','st-le','st-lm','st-ls','st-lseed','st-lboost','st-lm2','st-lm1','st-scr','st-scrl','st-gigs','st-swing','st-mkt'];
     Object.keys(BIZ).forEach(t => all.push('bc-' + t, 'br-i-' + t, 'br-l-' + t)); all.push('st-renew', 'st-bizlim');
     for (let i = 0; i < 4; i++) all.push('ut-n-' + i, 'ut-a-' + i, 'hm-n-' + i, 'hm-r-' + i, 'hm-p-' + i);
     clear(...all); toast('Settings saved');
