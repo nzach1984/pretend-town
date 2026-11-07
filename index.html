@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Town Bank">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Pretend Town Bank</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=DM+Mono:wght@500&family=Caveat:wght@600&display=swap">
+<style>
+/* Layout: a town bank on an iPad. Sticky header + tab rail, then a two-column working area that stacks on phones. Account cards borrow banknote engraving. */
+:root{
+  --paper:#EDF2EE; --card:#FAFCFA; --ink:#12302A; --muted:#566B63; --line:#C9D7CF;
+  --note:#1B6A50; --note-ink:#FFFFFF; --coin:#D4951A; --good:#1C7A4C; --bad:#B4412C; --warn:#A87414;
+  --shade:rgba(18,48,42,.08);
+  --f-display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --f-body:"Figtree", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --f-num:"DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --f-sig:"Caveat", "Bradley Hand", cursive;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0D1613; --card:#14211D; --ink:#E2EDE8; --muted:#94A9A0; --line:#2A3D36;
+  --note:#47AE86; --note-ink:#06140F; --coin:#E6AE48; --good:#5CC48E; --bad:#E7735C; --warn:#DDAA4E;
+  --shade:rgba(0,0,0,.35); color-scheme:dark }}
+:root[data-theme="dark"]{
+  --paper:#0D1613; --card:#14211D; --ink:#E2EDE8; --muted:#94A9A0; --line:#2A3D36;
+  --note:#47AE86; --note-ink:#06140F; --coin:#E6AE48; --good:#5CC48E; --bad:#E7735C; --warn:#DDAA4E;
+  --shade:rgba(0,0,0,.35); color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--card)}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.1}
+h1{font-size:clamp(2rem,6vw,3.2rem);font-weight:800;letter-spacing:-.02em}
+h2{font-size:1.5rem;font-weight:800;letter-spacing:-.01em}
+h3{font-size:1.1rem;font-weight:600}
+p{margin:0}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.eyebrow{font-size:.75rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:600}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--card);border-bottom:1px solid var(--line)}
+.top-in{display:flex;align-items:center;gap:12px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1160px;margin:0 auto}
+.seal{width:38px;height:38px;border-radius:50%;background:var(--note);color:var(--note-ink);display:grid;place-items:center;font-family:var(--f-display);font-weight:800;font-size:1.1rem;flex:none;box-shadow:inset 0 0 0 3px var(--card),inset 0 0 0 4px var(--note)}
+.brand{min-width:0;flex:1}
+.brand b{display:block;font-family:var(--f-display);font-size:1.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand span{font-size:.8rem;color:var(--muted)}
+.tabs{display:flex;gap:4px;overflow-x:auto;padding-bottom:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1160px;margin:0 auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;border:0;background:transparent;color:var(--muted);font:600 .95rem var(--f-body);padding:10px 14px;border-radius:999px;cursor:pointer;min-height:44px}
+.tab[aria-current="page"]{background:var(--note);color:var(--note-ink)}
+.tab .dot{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--coin);color:#1b1205;font-size:.75rem;line-height:20px;text-align:center}
+
+main{max-width:1160px;margin:0 auto;padding-block:20px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:20px}
+.cols{display:grid;gap:20px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:820px){.cols{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr)} .cols.even{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.stack{display:grid;gap:20px;align-content:start;min-width:0}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:14px;min-width:0}
+.panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+
+.accts{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.acct{position:relative;overflow:hidden;border-radius:16px;padding:18px;color:var(--note-ink);background:var(--note);min-height:150px;display:flex;flex-direction:column;justify-content:space-between;gap:16px;box-shadow:0 8px 24px var(--shade)}
+.acct.sav{background:var(--coin);color:#1b1205}
+.acct::before{content:"";position:absolute;inset:0;opacity:.18;pointer-events:none;
+  background:repeating-radial-gradient(circle at 100% 0%,transparent 0 9px,currentColor 9px 10px),repeating-radial-gradient(circle at 0% 120%,transparent 0 13px,currentColor 13px 14px)}
+.acct>*{position:relative}
+.acct .k{font-size:.75rem;text-transform:uppercase;letter-spacing:.14em;font-weight:700;opacity:.85;display:flex;justify-content:space-between;gap:8px}
+.acct .v{font-family:var(--f-num);font-size:clamp(1.8rem,5vw,2.4rem);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.acct .s{font-size:.85rem;opacity:.9}
+
+.stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.stat{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card)}
+.stat b{display:block;font-family:var(--f-num);font-size:1.4rem;font-variant-numeric:tabular-nums}
+.stat span{font-size:.8rem;color:var(--muted)}
+
+.list{display:grid}
+.li{display:flex;gap:12px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}
+.li:first-child{border-top:0}
+.li .main{flex:1;min-width:0}
+.li .main b{display:block;font-weight:600;overflow-wrap:anywhere}
+.li .main small{color:var(--muted);font-size:.82rem}
+.li .amt{font-family:var(--f-num);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+.badge{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex:none;font-weight:700;font-size:.8rem;background:var(--paper);color:var(--muted);border:1px solid var(--line)}
+.pill{display:inline-block;font-size:.75rem;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.pill.good{color:var(--good)} .pill.bad{color:var(--bad)} .pill.warn{color:var(--warn)} .pill.note{color:var(--note)} .pill.mute{color:var(--muted)}
+
+form{display:grid;gap:12px;margin:0}
+.fields{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+label{display:grid;gap:5px;font-size:.85rem;font-weight:600;color:var(--muted)}
+input,select,textarea{font:500 1rem var(--f-body);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:11px 12px;min-height:46px;width:100%;min-width:0}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:3px solid var(--coin);outline-offset:2px}
+.btn{font:700 1rem var(--f-body);border:0;border-radius:12px;padding:12px 18px;min-height:46px;cursor:pointer;background:var(--note);color:var(--note-ink)}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.gold{background:var(--coin);color:#1b1205}
+.btn.danger{background:transparent;color:var(--bad);border:1px solid var(--bad)}
+.btn.sm{padding:8px 12px;min-height:38px;font-size:.88rem;border-radius:10px}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.inline{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+.inline>label{flex:1 1 120px}
+
+/* the check */
+.check{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:20px;gap:16px;position:relative;
+  background-image:repeating-linear-gradient(135deg,transparent 0 7px,var(--shade) 7px 8px);box-shadow:0 6px 20px var(--shade)}
+.check-top{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:.85rem;color:var(--muted)}
+.check-top b{font-family:var(--f-display);color:var(--ink);font-size:1.05rem}
+.check label{color:var(--ink)}
+.check input,.check select{background:transparent;border:0;border-bottom:2px solid var(--line);border-radius:0;padding:8px 2px}
+.sigline{display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap}
+.sig{font-family:var(--f-sig);font-size:2rem;color:var(--note);border-bottom:1px solid var(--muted);min-width:180px;padding:0 8px;line-height:1.1}
+.micr{font-family:var(--f-num);font-size:.8rem;color:var(--muted);letter-spacing:.1em}
+
+.gauge-wrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.gauge{width:150px;height:auto;flex:none}
+.score{font-family:var(--f-num);font-size:2.4rem;line-height:1}
+
+.tbl-wrap{overflow-x:auto;margin:0 -4px}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+th{text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:700;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.r,th.r{text-align:right}
+td.num{white-space:nowrap}
+
+.pick{max-width:860px;margin:0 auto;display:grid;gap:22px;padding-block:24px}
+.people{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.person{border:1px solid var(--line);background:var(--card);border-radius:16px;padding:18px 14px;display:grid;justify-items:center;gap:10px;cursor:pointer;font:600 1.05rem var(--f-body);color:var(--ink);min-height:150px}
+.person .av{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font:800 1.6rem var(--f-display);color:#fff}
+.person small{color:var(--muted);font-weight:500;font-size:.82rem}
+.person.bank{border-style:dashed}
+.person.bank .av{background:var(--ink);color:var(--paper)}
+
+.empty{border:1px dashed var(--line);border-radius:12px;padding:18px;color:var(--muted);text-align:center}
+.shop{border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:10px;background:var(--paper)}
+.awning{height:10px;border-radius:6px;background:repeating-linear-gradient(90deg,var(--note) 0 18px,var(--card) 18px 36px)}
+
+.overlay{position:fixed;inset:0;background:rgba(5,15,12,.55);display:grid;place-items:center;z-index:20;padding:20px}
+.dialog{background:var(--card);border-radius:18px;padding:22px;max-width:420px;width:100%;display:grid;gap:14px;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pad button{min-height:60px;font:600 1.4rem var(--f-num);border-radius:14px;border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer}
+.dots{display:flex;gap:14px;justify-content:center}
+.dots i{width:16px;height:16px;border-radius:50%;border:2px solid var(--note)}
+.dots i.on{background:var(--note)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);padding:12px 18px;border-radius:12px;font-weight:600;z-index:30;max-width:calc(100% - 32px);box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.toast.err{background:var(--bad);color:#fff}
+.center{min-height:60vh;display:grid;place-items:center;text-align:center;padding:20px}
+@media (prefers-reduced-motion:no-preference){.acct,.panel{animation:rise .3s ease-out both}@keyframes rise{from{transform:translateY(6px)}to{transform:none}}}
+</style>
+</head><body>
+<div id="app"><div class="center"><div><h2>Opening the bank…</h2><p class="muted">Counting the money.</p></div></div></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+</body></html>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+</body></html>
+<script>
+// ===== PASTE YOUR FIREBASE SETTINGS BETWEEN THE BRACES BELOW =====
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBP_IfTFX5AwGqnAF8kVO27s6EQxAeBc3A",
+  authDomain: "pretend-town.firebaseapp.com",
+  projectId: "pretend-town",
+  storageBucket: "pretend-town.firebasestorage.app",
+  messagingSenderId: "990407541160",
+  appId: "1:990407541160:web:7f22714142c230f4dd5d9d"
+};
+// ==================================================================
+</script>
+</body></html>
+<script>
+(() => {
+const app = document.getElementById('app');
+let db = null;
+const S = {
+  dbState: 'loading', settings: undefined, settingsConfirmed: false,
+  players: {}, tx: [], shops: {}, items: {}, orders: [], loans: {},
+  me: null, tab: null, modal: null, pin: null, toast: null, busy: false, err: null, slow: false,
+};
+const COLORS = ['#2F7D6B','#C0612B','#5B5BB5','#B0457A','#3C7FB0','#8A6D1F','#6C8A2E','#9C4BB3'];
+
+// ---------- utils ----------
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ls = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } };
+const hash = s => { let h = 7; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
+const sym = () => S.settings?.symbol || '$';
+const money = (c, signed) => { const v = Math.abs(c || 0) / 100; const s = sym() + v.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}); return (c < 0 ? '−' : (signed && c > 0 ? '+' : '')) + s; };
+const toCents = v => { const n = parseFloat(String(v).replace(/[^0-9.]/g, '')); return isFinite(n) ? Math.round(n * 100) : NaN; };
+const when = t => { const d = new Date(t); return d.toLocaleDateString(undefined, {month: 'short', day: 'numeric'}) + ', ' + d.toLocaleTimeString(undefined, {hour: 'numeric', minute: '2-digit'}); };
+const acctNo = id => String(1000 + hash(id) % 9000);
+const color = id => COLORS[hash(id) % COLORS.length];
+const initial = n => esc((n || '?').trim().charAt(0).toUpperCase());
+const fail = msg => { const e = new Error(msg); e.userMsg = msg; throw e; };
+const val = id => document.getElementById(id)?.value ?? '';
+const rate = k => Number(S.settings?.[k] ?? 0);
+
+function nameOf(pid) { return pid === 'bank' ? 'Town Bank' : (S.players[pid]?.name || 'Former resident'); }
+function balances() {
+  const b = {};
+  for (const t of S.tx) {
+    if (t.from !== 'bank') b[t.from] = (b[t.from] || 0) - t.amount;
+    if (t.to !== 'bank') b[t.to] = (b[t.to] || 0) + t.amount;
+  }
+  return b;
+}
+const bal = (b, pid, a) => b[pid + '.' + a] || 0;
+const playerList = () => Object.values(S.players).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+const loansOf = pid => Object.values(S.loans).filter(l => l.playerId === pid).sort((a, b) => b.at - a.at);
+
+function credit(pid) {
+  const p = S.players[pid] || {};
+  const ls_ = loansOf(pid);
+  let paid = 0, pays = 0, missed = 0, owed = 0;
+  for (const l of ls_) {
+    if (l.status === 'paid') paid++;
+    if (l.status === 'active') owed += l.balance || 0;
+    pays += l.payments || 0; missed += l.missed || 0;
+  }
+  const base = Math.max(5000, (p.wage || 0) * 3);
+  let score = 620 + paid * 40 + Math.min(100, pays * 6) - missed * 60 - Math.round(Math.min(1, owed / base) * 80);
+  score = Math.max(300, Math.min(850, score));
+  const band = score >= 750 ? ['Excellent', 'good'] : score >= 670 ? ['Good', 'note'] : score >= 580 ? ['Fair', 'warn'] : ['Needs work', 'bad'];
+  const mult = score >= 750 ? 2 : score >= 670 ? 1.5 : score >= 580 ? 1 : .5;
+  const limit = Math.round(base * mult);
+  return {score, band, limit, owed, avail: Math.max(0, limit - owed), paid, pays, missed};
+}
+function gauge(score, cls) {
+  const f = (score - 300) / 550, a = Math.PI * (1 - f), r = 48;
+  const x = 60 + r * Math.cos(a), y = 60 - r * Math.sin(a);
+  return `<svg class="gauge" viewBox="0 0 120 68" aria-hidden="true">
+    <path d="M12 60 A48 48 0 0 1 108 60" fill="none" stroke="var(--line)" stroke-width="10" stroke-linecap="round"/>
+    ${f > 0.005 ? `<path d="M12 60 A48 48 0 0 1 ${x.toFixed(1)} ${y.toFixed(1)}" fill="none" stroke="var(--${cls})" stroke-width="10" stroke-linecap="round"/>` : ''}
+    <text x="12" y="67" font-size="7" fill="var(--muted)" text-anchor="middle">300</text>
+    <text x="108" y="67" font-size="7" fill="var(--muted)" text-anchor="middle">850</text></svg>`;
+}
+
+const KIND = {pay:'Paycheck', check:'Check', move:'Savings transfer', purchase:'Purchase', refund:'Refund', loan:'Loan', repay:'Loan payment', interest:'Interest', adjust:'From the bank'};
+function txRows(list, pid, limit = 15) {
+  const rows = list.slice(0, limit).map(t => {
+    let delta = null, title = t.memo || KIND[t.kind] || 'Transaction';
+    if (pid) {
+      const out = t.from.startsWith(pid + '.'), inn = t.to.startsWith(pid + '.');
+      if (out && inn) delta = null;
+      else delta = inn ? t.amount : -t.amount;
+    }
+    const who = pid
+      ? (t.kind === 'move' ? (t.to.endsWith('.s') ? 'Checking → Savings' : 'Savings → Checking')
+        : (t.to.startsWith(pid + '.') ? 'From ' + nameOf(t.from.split('.')[0]) : 'To ' + nameOf(t.to.split('.')[0])))
+      : nameOf(t.from.split('.')[0]) + ' → ' + nameOf(t.to.split('.')[0]);
+    const amt = delta === null ? `<span class="amt">${money(t.amount)}</span>` : `<span class="amt ${delta > 0 ? 'pos' : 'neg'}">${money(delta, true)}</span>`;
+    return `<div class="li"><span class="badge">${esc((KIND[t.kind] || 'Tx').slice(0, 3).toUpperCase())}</span>
+      <div class="main"><b>${esc(title)}</b><small>${esc(who)} · ${when(t.at)}</small></div>${amt}</div>`;
+  }).join('');
+  return rows || `<div class="empty">No transactions yet.</div>`;
+}
+const myTx = pid => S.tx.filter(t => t.from.startsWith(pid + '.') || t.to.startsWith(pid + '.'));
+
+// ---------- writes ----------
+async function addTx(from, to, amount, kind, memo, extra = {}) {
+  await db.collection('tx').add({from, to, amount, kind, memo, at: Date.now(), ...extra});
+}
+function toast(msg, err) { S.toast = {msg, err}; clearTimeout(toast.t); toast.t = setTimeout(() => { S.toast = null; render(); }, 2800); render(); }
+async function run(fn) {
+  if (S.busy) return;
+  S.busy = true;
+  try { await fn(); }
+  catch (e) {
+    console.error(e);
+    toast(e.userMsg || (e.code === 'resource-exhausted' ? 'The bank hit today’s free limit. It will work again tomorrow.'
+      : e.code === 'permission-denied' ? 'The database refused that change. Check the Firestore rules.'
+      : 'That didn’t save. Check the Wi-Fi and try again.'), true);
+  } finally { S.busy = false; render(); }
+}
+const clearIds = new Set();
+const clear = (...ids) => ids.forEach(i => clearIds.add(i));
+
+// ---------- render ----------
+let raf = 0;
+function schedule() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; render(); }); }
+function render() {
+  const saved = {}; const ae = document.activeElement;
+  app.querySelectorAll('input[id],select[id],textarea[id]').forEach(el => saved[el.id] = el.value);
+  const focusId = ae && ae.id && app.contains(ae) ? ae.id : null;
+  let sel = null; try { sel = focusId ? [ae.selectionStart, ae.selectionEnd] : null; } catch (e) {}
+  app.innerHTML = view();
+  for (const [id, v] of Object.entries(saved)) {
+    if (clearIds.has(id)) continue;
+    const el = document.getElementById(id); if (el && el.type !== 'hidden') el.value = v;
+  }
+  clearIds.clear();
+  if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus({preventScroll: true}); try { if (sel && sel[0] != null) el.setSelectionRange(sel[0], sel[1]); } catch (e) {} } }
+}
+
+function view() {
+  let body;
+  if (S.dbState === 'none') body = center('The bank isn’t connected yet', 'The Firebase settings haven’t been added to this app. Paste them into FIREBASE_CONFIG near the top of index.html.');
+  else if (S.err) body = center('The bank is closed right now', S.err === 'permission-denied' ? 'The database refused access. Check the Firestore rules in the Firebase console.' : 'Something stopped the bank from loading. Close and reopen this page.');
+  else if (S.settings === undefined || (S.settings === null && !S.settingsConfirmed))
+    body = center('Opening the bank…', S.slow ? 'The bank can’t be reached yet. Check the Wi-Fi; it will open as soon as it connects.' : 'Counting the money.');
+  else if (S.settings === null) body = viewSetup();
+  else if (S.me === 'bank') body = shell(true);
+  else if (S.me && S.players[S.me]) body = shell(false);
+  else body = viewPick();
+  return body + viewModal() + (S.toast ? `<div class="toast ${S.toast.err ? 'err' : ''}" role="status">${esc(S.toast.msg)}</div>` : '');
+}
+const center = (h, p) => `<div class="center"><div style="display:grid;gap:8px;max-width:420px"><h2>${esc(h)}</h2><p class="muted">${esc(p)}</p></div></div>`;
+
+function viewSetup() {
+  return `<div class="pick"><div style="display:grid;gap:10px">
+    <p class="eyebrow">Open a new bank</p><h1>Let’s found your town</h1>
+    <p class="muted" style="max-width:60ch">You’ll be the banker. You run payday, approve loans and set the rules. Each kid gets a checking and savings account, a job, a credit score, and can open a shop.</p></div>
+    <form class="panel" data-form="setup">
+      <div class="fields">
+        <label>Town name<input id="su-name" required maxlength="40" placeholder="Maple Creek"></label>
+        <label>Money symbol<input id="su-sym" maxlength="3" value="$"></label>
+        <label>Banker PIN (4 digits)<input id="su-pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required placeholder="1234"></label>
+      </div>
+      <p class="muted" style="font-size:.85rem">The PIN keeps kids out of banker mode during play. It is a game lock, not real security.</p>
+      <div><button class="btn">Open the bank</button></div>
+    </form></div>`;
+}
+
+function viewPick() {
+  const ps = playerList();
+  const tiles = ps.map(p => `<button class="person" data-act="pick" data-id="${p.id}">
+      <span class="av" style="background:${color(p.id)}">${initial(p.name)}</span>${esc(p.name)}<small>${esc(p.job || 'No job yet')}</small></button>`).join('');
+  return `<div class="pick" style="padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))">
+    <div style="display:grid;gap:6px"><p class="eyebrow">Welcome to</p><h1>${esc(S.settings.name)}</h1><p class="muted">Tap your name to open your accounts.</p></div>
+    <div class="people">${tiles}
+      <button class="person bank" data-act="pickBank"><span class="av">$</span>Banker<small>Grown-ups only</small></button></div>
+    ${ps.length ? '' : '<div class="empty">No residents yet. The banker adds them under Residents.</div>'}
+  </div>`;
+}
+
+function shell(isBank) {
+  const tabs = isBank
+    ? [['town','Town'],['payday','Payday'],['loans','Loans', Object.values(S.loans).filter(l => l.status === 'requested').length],['people','Residents'],['shops','Shops'],['settings','Settings']]
+    : [['home','Accounts'],['pay','Write a check'],['shop','Shops'],['myshop','My shop', S.orders.filter(o => o.sellerId === S.me && o.status === 'new').length],['loans','Credit & loans']];
+  if (!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
+  const who = isBank ? 'Banker mode' : nameOf(S.me) + (S.players[S.me]?.job ? ' · ' + S.players[S.me].job : '');
+  const content = isBank ? bankView() : playerView();
+  return `<header class="top"><div class="top-in">
+      <span class="seal">${initial(S.settings.name)}</span>
+      <div class="brand"><b>${esc(S.settings.name)} Bank</b><span>${esc(who)}</span></div>
+      <button class="btn ghost sm" data-act="switch">Switch person</button></div>
+    <nav class="tabs" aria-label="Sections">${tabs.map(([k, l, n]) => `<button class="tab" data-act="tab" data-id="${k}" ${S.tab === k ? 'aria-current="page"' : ''}>${l}${n ? `<span class="dot">${n}</span>` : ''}</button>`).join('')}</nav>
+  </header><main>${content}</main>`;
+}
+
+// ---------- player views ----------
+function playerView() {
+  const pid = S.me, p = S.players[pid], b = balances();
+  if (S.tab === 'home') {
+    const cr = credit(pid);
+    const pendingOrders = S.orders.filter(o => o.buyerId === pid && o.status === 'new');
+    return `<div style="display:grid;gap:4px"><p class="eyebrow">Your accounts</p><h2>Hi, ${esc(p.name)}</h2></div>
+    <div class="accts">
+      <div class="acct"><div class="k"><span>Checking</span><span class="num">•• ${acctNo(pid + 'c')}</span></div>
+        <div class="v">${money(bal(b, pid, 'c'))}</div><div class="s">For spending, checks and shopping</div></div>
+      <div class="acct sav"><div class="k"><span>Savings</span><span class="num">•• ${acctNo(pid + 's')}</span></div>
+        <div class="v">${money(bal(b, pid, 's'))}</div><div class="s">Earns ${rate('savingsRate')}% each time the bank pays interest</div></div>
+    </div>
+    <div class="cols"><div class="stack">
+      <section class="panel"><div class="panel-head"><h3>Recent activity</h3><span class="muted" style="font-size:.85rem">${myTx(pid).length} total</span></div>
+        <div class="list">${txRows(myTx(pid), pid, 20)}</div></section>
+    </div><div class="stack">
+      <section class="panel"><h3>Move money</h3>
+        <form data-form="move">
+          <div class="fields"><label>Direction<select id="mv-dir"><option value="s">Checking → Savings</option><option value="c">Savings → Checking</option></select></label>
+          <label>Amount<input id="mv-amt" inputmode="decimal" placeholder="0.00" required></label></div>
+          <div><button class="btn">Move it</button></div></form></section>
+      <section class="panel"><div class="panel-head"><h3>Your job</h3><span class="pill note">${esc(p.job || 'Unassigned')}</span></div>
+        <p>Paycheck: <b class="num">${money(p.wage || 0)}</b> before ${rate('taxRate')}% town tax, so <b class="num">${money((p.wage || 0) - Math.round((p.wage || 0) * rate('taxRate') / 100))}</b> lands in checking each payday.</p></section>
+      <section class="panel"><div class="gauge-wrap">${gauge(cr.score, cr.band[1])}<div><p class="eyebrow">Credit score</p><div class="score num">${cr.score}</div><span class="pill ${cr.band[1]}">${cr.band[0]}</span></div></div>
+        <button class="btn ghost sm" data-act="tab" data-id="loans">See credit & loans</button></section>
+      ${pendingOrders.length ? `<section class="panel"><h3>Waiting for delivery</h3><div class="list">${pendingOrders.map(o => `<div class="li"><div class="main"><b>${o.qty} × ${esc(o.itemName)}</b><small>from ${esc(S.shops[o.shopId]?.name || 'a shop')}</small></div><span class="amt">${money(o.total)}</span></div>`).join('')}</div></section>` : ''}
+    </div></div>`;
+  }
+  if (S.tab === 'pay') {
+    const others = playerList().filter(x => x.id !== pid);
+    const checksSent = S.tx.filter(t => t.kind === 'check' && t.from === pid + '.c').length;
+    const checks = S.tx.filter(t => t.kind === 'check' && (t.from === pid + '.c' || t.to === pid + '.c'));
+    return `<div class="cols"><div class="stack">
+      ${others.length ? `<form class="check" data-form="check">
+        <div class="check-top"><b>${esc(S.settings.name)} Bank</b><span>No. <span class="num">${101 + checksSent}</span></span><span>${new Date().toLocaleDateString()}</span></div>
+        <label>Pay to the order of<select id="ck-to" required><option value="">Choose a person…</option>${others.map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select></label>
+        <label>Amount (${esc(sym())})<input id="ck-amt" inputmode="decimal" placeholder="0.00" required></label>
+        <label>Memo<input id="ck-memo" maxlength="60" placeholder="What’s it for?"></label>
+        <div class="sigline"><div><span class="muted" style="font-size:.8rem">Signed</span><div class="sig">${esc(p.name)}</div></div><button class="btn">Sign & send</button></div>
+        <div class="micr">⑆${acctNo(S.settings.name)}⑆ ${acctNo(pid + 'c')}⑈ ${101 + checksSent}</div>
+      </form>` : `<div class="empty">There’s nobody else in town to pay yet.</div>`}
+      <p class="muted" style="font-size:.9rem">Checks come out of checking. You have <b class="num">${money(bal(b, pid, 'c'))}</b> available.</p>
+    </div><div class="stack"><section class="panel"><h3>Your checks</h3><div class="list">${txRows(checks, pid, 30)}</div></section></div></div>`;
+  }
+  if (S.tab === 'shop') {
+    const shops = Object.values(S.shops).filter(s => s.ownerId !== pid);
+    const mine = S.orders.filter(o => o.buyerId === pid).sort((a, c) => c.at - a.at);
+    const st = {new: ['Ordered', 'warn'], done: ['Delivered', 'good'], refunded: ['Refunded', 'mute']};
+    return `<div class="cols"><div class="stack">
+      <div><p class="eyebrow">Main Street</p><h2>Shops in town</h2></div>
+      ${shops.length ? shops.map(s => {
+        const items = Object.values(S.items).filter(i => i.shopId === s.id);
+        return `<section class="shop"><div class="awning"></div><div class="panel-head"><h3>${esc(s.name)}</h3><span class="muted" style="font-size:.85rem">Owner: ${esc(nameOf(s.ownerId))}</span></div>
+          ${s.desc ? `<p class="muted">${esc(s.desc)}</p>` : ''}
+          <div class="list">${items.length ? items.map(i => {
+            const out = i.stock != null && i.stock <= 0;
+            return `<div class="li"><div class="main"><b>${esc(i.name)}</b><small>${i.stock == null ? 'Always in stock' : out ? 'Sold out' : i.stock + ' left'}</small></div>
+              <span class="amt">${money(i.price)}</span>
+              ${out ? '' : `<input id="q-${i.id}" type="number" min="1" value="1" style="width:70px;min-height:40px;padding:6px 8px" aria-label="Quantity"><button class="btn sm" data-act="buy" data-id="${i.id}">Buy</button>`}</div>`;
+          }).join('') : '<div class="empty">Nothing for sale yet.</div>'}</div></section>`;
+      }).join('') : '<div class="empty">No other shops are open yet. Open your own under My shop.</div>'}
+    </div><div class="stack"><section class="panel"><h3>Your orders</h3><div class="list">${mine.length ? mine.map(o => `<div class="li"><div class="main"><b>${o.qty} × ${esc(o.itemName)}</b><small>${esc(S.shops[o.shopId]?.name || 'Closed shop')} · ${when(o.at)}</small></div><span class="pill ${st[o.status][1]}">${st[o.status][0]}</span><span class="amt">${money(o.total)}</span></div>`).join('') : '<div class="empty">You haven’t ordered anything.</div>'}</div></section></div></div>`;
+  }
+  if (S.tab === 'myshop') {
+    const shop = Object.values(S.shops).find(s => s.ownerId === pid);
+    if (!shop) return `<section class="panel" style="max-width:560px"><h2>Open a shop</h2><p class="muted">Sell things to the rest of town. Buyers pay you straight into checking.</p>
+      <form data-form="openShop"><label>Shop name<input id="os-name" required maxlength="40" placeholder="Lemonade Stand"></label>
+      <label>What do you sell?<input id="os-desc" maxlength="100" placeholder="Fresh lemonade and cookies"></label><div><button class="btn">Open for business</button></div></form></section>`;
+    const items = Object.values(S.items).filter(i => i.shopId === shop.id);
+    const orders = S.orders.filter(o => o.shopId === shop.id).sort((a, c) => c.at - a.at);
+    const sales = orders.filter(o => o.status !== 'refunded').reduce((s, o) => s + o.total, 0);
+    return `<div class="panel-head"><div><p class="eyebrow">Your shop</p><h2>${esc(shop.name)}</h2></div><button class="btn danger sm" data-act="closeShop" data-id="${shop.id}">Close shop</button></div>
+    <div class="stats"><div class="stat"><b>${money(sales)}</b><span>Total sales</span></div><div class="stat"><b>${orders.filter(o => o.status === 'new').length}</b><span>Orders to deliver</span></div><div class="stat"><b>${items.length}</b><span>Items for sale</span></div></div>
+    <div class="cols even"><div class="stack">
+      <section class="panel"><h3>Orders</h3><div class="list">${orders.length ? orders.map(o => `<div class="li"><div class="main"><b>${o.qty} × ${esc(o.itemName)}</b><small>${esc(nameOf(o.buyerId))} · ${when(o.at)} · ${money(o.total)}</small></div>
+        ${o.status === 'new' ? `<button class="btn sm" data-act="deliver" data-id="${o.id}">Delivered</button><button class="btn ghost sm" data-act="refund" data-id="${o.id}">Refund</button>` : `<span class="pill ${o.status === 'done' ? 'good' : 'mute'}">${o.status === 'done' ? 'Delivered' : 'Refunded'}</span>`}</div>`).join('') : '<div class="empty">No orders yet.</div>'}</div></section>
+    </div><div class="stack">
+      <section class="panel"><h3>Add an item</h3><form data-form="addItem"><div class="fields">
+        <label>Item<input id="ai-name" required maxlength="40" placeholder="Cookie"></label>
+        <label>Price<input id="ai-price" inputmode="decimal" required placeholder="1.50"></label>
+        <label>Stock<input id="ai-stock" type="number" min="0" placeholder="Blank = unlimited"></label></div>
+        <div><button class="btn">Add to shop</button></div></form></section>
+      <section class="panel"><h3>Price list</h3><div class="list">${items.length ? items.map(i => `<form class="li" data-form="editItem" data-id="${i.id}" style="display:flex">
+        <div class="main"><b>${esc(i.name)}</b></div>
+        <input id="ei-p-${i.id}" inputmode="decimal" value="${(i.price / 100).toFixed(2)}" style="width:86px;min-height:40px;padding:6px 8px" aria-label="Price">
+        <input id="ei-s-${i.id}" type="number" min="0" value="${i.stock ?? ''}" placeholder="∞" style="width:70px;min-height:40px;padding:6px 8px" aria-label="Stock">
+        <button class="btn ghost sm">Save</button><button type="button" class="btn danger sm" data-act="removeItem" data-id="${i.id}">✕</button></form>`).join('') : '<div class="empty">Add your first item.</div>'}</div></section>
+    </div></div>`;
+  }
+  if (S.tab === 'loans') {
+    const cr = credit(pid), loans = loansOf(pid);
+    const st = {requested: ['Waiting for banker', 'warn'], active: ['Active', 'note'], paid: ['Paid off', 'good'], declined: ['Declined', 'mute']};
+    return `<div class="cols"><div class="stack">
+      <section class="panel"><div class="gauge-wrap">${gauge(cr.score, cr.band[1])}<div style="display:grid;gap:4px"><p class="eyebrow">Your credit score</p><div class="score num">${cr.score}</div><span class="pill ${cr.band[1]}">${cr.band[0]}</span></div></div>
+        <div class="stats">
+          <div class="stat"><b>${cr.paid}</b><span>Loans paid off (+40 each)</span></div>
+          <div class="stat"><b>${cr.pays}</b><span>Payments made (+6 each)</span></div>
+          <div class="stat"><b>${cr.missed}</b><span>Missed payments (−60 each)</span></div>
+          <div class="stat"><b>${money(cr.owed)}</b><span>Owed of ${money(cr.limit)} limit</span></div></div>
+        <p class="muted" style="font-size:.88rem">Scores run 300 to 850. Paying loans back raises it. Missing payments or borrowing close to your limit lowers it. A better score gives you a bigger credit limit.</p></section>
+      <section class="panel"><h3>Your loans</h3>${loans.length ? loans.map(l => `<div class="shop">
+        <div class="panel-head"><b>${esc(l.purpose || 'Loan')} · ${money(l.amount)}</b><span class="pill ${st[l.status][1]}">${st[l.status][0]}</span></div>
+        ${l.status === 'active' ? `<p>Still owe <b class="num">${money(l.balance)}</b> · ${l.rate}% interest each interest day · interest so far <span class="num">${money(l.interest || 0)}</span></p>
+          <form class="inline" data-form="repay" data-id="${l.id}"><label>Pay back<input id="rp-${l.id}" inputmode="decimal" placeholder="${(Math.min(l.balance, bal(balances(), pid, 'c')) / 100).toFixed(2)}" required></label><button class="btn gold">Make payment</button></form>`
+        : `<small class="muted">${when(l.at)}${l.status === 'paid' ? ` · paid ${money(l.interest || 0)} in interest` : ''}</small>`}</div>`).join('') : '<div class="empty">No loans yet.</div>'}</section>
+    </div><div class="stack">
+      <section class="panel"><h3>Ask for a loan</h3><p>You can borrow up to <b class="num">${money(cr.avail)}</b> right now. Current loan rate: <b>${rate('loanRate')}%</b> each interest day.</p>
+        <form data-form="request"><div class="fields"><label>Amount<input id="lr-amt" inputmode="decimal" required placeholder="0.00"></label>
+          <label>What’s it for?<input id="lr-why" maxlength="50" required placeholder="Supplies for my shop"></label></div>
+          <div><button class="btn" ${cr.avail <= 0 ? 'disabled' : ''}>Send to the banker</button></div></form></section>
+    </div></div>`;
+  }
+  return '';
+}
+
+// ---------- banker views ----------
+function bankView() {
+  const b = balances(), ps = playerList();
+  if (S.tab === 'town') {
+    const chk = ps.reduce((s, p) => s + bal(b, p.id, 'c'), 0), sav = ps.reduce((s, p) => s + bal(b, p.id, 's'), 0);
+    const owed = Object.values(S.loans).filter(l => l.status === 'active').reduce((s, l) => s + l.balance, 0);
+    return `<div class="stats"><div class="stat"><b>${money(chk + sav)}</b><span>Money in town</span></div><div class="stat"><b>${money(sav)}</b><span>In savings</span></div>
+      <div class="stat"><b>${money(owed)}</b><span>Owed on loans</span></div><div class="stat"><b>${S.tx.length}</b><span>Transactions</span></div></div>
+    <div class="cols"><div class="stack">
+      <section class="panel"><h3>Residents</h3>${ps.length ? `<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Job</th><th class="r">Checking</th><th class="r">Savings</th><th class="r">Owes</th><th class="r">Credit</th></tr></thead><tbody>
+        ${ps.map(p => { const c = credit(p.id); return `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.job || '—')}</td><td class="r num">${money(bal(b, p.id, 'c'))}</td><td class="r num">${money(bal(b, p.id, 's'))}</td><td class="r num">${money(c.owed)}</td><td class="r"><span class="pill ${c.band[1]}">${c.score}</span></td></tr>`; }).join('')}
+        </tbody></table></div>` : `<div class="empty">Add residents under the Residents tab.</div>`}</section>
+      <section class="panel"><h3>Town ledger</h3><div class="list">${txRows(S.tx, null, 60)}</div></section>
+    </div><div class="stack">
+      <section class="panel"><h3>Give or take money</h3><p class="muted" style="font-size:.88rem">Bonuses, birthday money, fines, or fixing a mistake. Taking money can push an account below zero.</p>
+        <form data-form="adjust"><div class="fields">
+          <label>Resident<select id="ad-who" required><option value="">Choose…</option>${ps.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label>
+          <label>Account<select id="ad-acct"><option value="c">Checking</option><option value="s">Savings</option></select></label>
+          <label>Give or take<select id="ad-dir"><option value="give">Give</option><option value="take">Take</option></select></label>
+          <label>Amount<input id="ad-amt" inputmode="decimal" required placeholder="0.00"></label></div>
+          <label>Reason<input id="ad-memo" maxlength="60" placeholder="Great job cleaning your room"></label>
+          <div><button class="btn">Record it</button></div></form></section>
+    </div></div>`;
+  }
+  if (S.tab === 'payday') {
+    const tr = rate('taxRate'), paid = ps.filter(p => (p.wage || 0) > 0);
+    const gross = paid.reduce((s, p) => s + p.wage, 0), tax = paid.reduce((s, p) => s + Math.round(p.wage * tr / 100), 0);
+    return `<div class="cols"><div class="stack"><section class="panel"><div class="panel-head"><h2>Payday</h2>
+        <span class="muted" style="font-size:.88rem">${S.settings.lastPayday ? 'Last payday ' + when(S.settings.lastPayday) : 'No payday yet'} · ${S.settings.paydays || 0} so far</span></div>
+      ${paid.length ? `<div class="tbl-wrap"><table><thead><tr><th>Resident</th><th>Job</th><th class="r">Gross</th><th class="r">Tax ${tr}%</th><th class="r">Take-home</th></tr></thead><tbody>
+        ${paid.map(p => { const t = Math.round(p.wage * tr / 100); return `<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.job || '—')}</td><td class="r num">${money(p.wage)}</td><td class="r num neg">${money(-t)}</td><td class="r num"><b>${money(p.wage - t)}</b></td></tr>`; }).join('')}
+        <tr><td colspan="2"><b>Total</b></td><td class="r num">${money(gross)}</td><td class="r num">${money(-tax)}</td><td class="r num"><b>${money(gross - tax)}</b></td></tr></tbody></table></div>
+        <div><button class="btn gold" data-act="payday">Run payday</button></div>` : `<div class="empty">Nobody has a wage yet. Set jobs and wages under Residents.</div>`}
+    </section></div><div class="stack"><section class="panel"><h3>How payday works</h3>
+      <p class="muted">Each resident’s wage is the gross pay. Town tax comes off the top and goes back to the bank. The rest is deposited to checking with a pay stub in their activity, so they can see gross versus take-home.</p>
+      <p class="muted">Change the tax rate in Settings.</p></section></div></div>`;
+  }
+  if (S.tab === 'loans') {
+    const all = Object.values(S.loans).sort((a, c) => c.at - a.at);
+    const req = all.filter(l => l.status === 'requested'), act = all.filter(l => l.status === 'active');
+    const loanInt = act.reduce((s, l) => s + Math.round(l.balance * l.rate / 100), 0);
+    const savInt = ps.reduce((s, p) => s + Math.max(0, Math.round(bal(b, p.id, 's') * rate('savingsRate') / 100)), 0);
+    return `<div class="cols"><div class="stack">
+      <section class="panel"><h3>Loan requests</h3>${req.length ? req.map(l => { const c = credit(l.playerId); return `<div class="shop">
+        <div class="panel-head"><b>${esc(nameOf(l.playerId))} wants ${money(l.amount)}</b><span class="pill ${c.band[1]}">Credit ${c.score}</span></div>
+        <p class="muted">For: ${esc(l.purpose)} · can borrow up to ${money(c.avail)} · ${when(l.at)}</p>
+        <form class="inline" data-form="approve" data-id="${l.id}"><label>Interest % per interest day<input id="la-${l.id}" inputmode="decimal" value="${l.rate}"></label>
+          <button class="btn">Approve</button><button type="button" class="btn ghost" data-act="decline" data-id="${l.id}">Decline</button></form></div>`; }).join('') : '<div class="empty">No requests waiting.</div>'}</section>
+      <section class="panel"><h3>Active loans</h3>${act.length ? `<div class="tbl-wrap"><table><thead><tr><th>Resident</th><th>For</th><th class="r">Balance</th><th class="r">Rate</th><th class="r">Missed</th><th></th></tr></thead><tbody>
+        ${act.map(l => `<tr><td><b>${esc(nameOf(l.playerId))}</b></td><td>${esc(l.purpose)}</td><td class="r num">${money(l.balance)}</td><td class="r">${l.rate}%</td><td class="r">${l.missed || 0}</td><td class="r"><button class="btn danger sm" data-act="missed" data-id="${l.id}">Missed a payment</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No active loans.</div>'}</section>
+    </div><div class="stack"><section class="panel"><h3>Interest day</h3>
+      <p class="muted">Adds interest to every active loan and pays interest into every savings account. Run it once a week, or whenever your town decides.</p>
+      <div class="stats"><div class="stat"><b>${money(loanInt)}</b><span>Added to loans (${act.length})</span></div><div class="stat"><b>${money(savInt)}</b><span>Paid to savings at ${rate('savingsRate')}%</span></div></div>
+      <p class="muted" style="font-size:.85rem">${S.settings.lastInterest ? 'Last interest day ' + when(S.settings.lastInterest) : 'Interest has never been run.'}</p>
+      <div><button class="btn gold" data-act="interest" ${loanInt + savInt <= 0 ? 'disabled' : ''}>Run interest day</button></div></section></div></div>`;
+  }
+  if (S.tab === 'people') {
+    return `<div class="cols"><div class="stack"><section class="panel"><h3>Residents</h3>
+      ${ps.length ? ps.map(p => `<form class="shop" data-form="editPlayer" data-id="${p.id}"><div class="fields">
+        <label>Name<input id="ep-n-${p.id}" value="${esc(p.name)}" required maxlength="24"></label>
+        <label>Job<input id="ep-j-${p.id}" value="${esc(p.job || '')}" maxlength="30"></label>
+        <label>Wage per payday<input id="ep-w-${p.id}" inputmode="decimal" value="${((p.wage || 0) / 100).toFixed(2)}"></label>
+        <label>PIN (optional)<input id="ep-p-${p.id}" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" value="${esc(p.pin || '')}"></label></div>
+        <div class="row"><button class="btn sm">Save</button><button type="button" class="btn danger sm" data-act="delPlayer" data-id="${p.id}">Remove</button></div></form>`).join('') : '<div class="empty">No residents yet. Add your kids on the right.</div>'}
+    </section></div><div class="stack"><section class="panel"><h3>Add a resident</h3><form data-form="addPlayer"><div class="fields">
+        <label>Name<input id="np-name" required maxlength="24"></label>
+        <label>Job<input id="np-job" maxlength="30" placeholder="Mail carrier"></label>
+        <label>Wage per payday<input id="np-wage" inputmode="decimal" placeholder="25.00"></label>
+        <label>Starting money<input id="np-start" inputmode="decimal" placeholder="50.00"></label>
+        <label>PIN (optional)<input id="np-pin" inputmode="numeric" maxlength="4" pattern="[0-9]{4}"></label></div>
+        <div><button class="btn">Add to town</button></div></form></section></div></div>`;
+  }
+  if (S.tab === 'shops') {
+    const shops = Object.values(S.shops);
+    return `<section class="panel"><h3>Shops on Main Street</h3>${shops.length ? `<div class="tbl-wrap"><table><thead><tr><th>Shop</th><th>Owner</th><th class="r">Items</th><th class="r">Sales</th><th class="r">Open orders</th><th></th></tr></thead><tbody>
+      ${shops.map(s => { const os = S.orders.filter(o => o.shopId === s.id); return `<tr><td><b>${esc(s.name)}</b></td><td>${esc(nameOf(s.ownerId))}</td><td class="r">${Object.values(S.items).filter(i => i.shopId === s.id).length}</td><td class="r num">${money(os.filter(o => o.status !== 'refunded').reduce((a, o) => a + o.total, 0))}</td><td class="r">${os.filter(o => o.status === 'new').length}</td><td class="r"><button class="btn danger sm" data-act="closeShop" data-id="${s.id}">Close</button></td></tr>`; }).join('')}
+      </tbody></table></div>` : '<div class="empty">No shops yet. Kids open shops from their own My shop tab.</div>'}</section>`;
+  }
+  if (S.tab === 'settings') {
+    const s = S.settings;
+    return `<section class="panel" style="max-width:640px"><h3>Bank rules</h3><form data-form="settings"><div class="fields">
+      <label>Town name<input id="st-name" value="${esc(s.name)}" required maxlength="40"></label>
+      <label>Money symbol<input id="st-sym" value="${esc(s.symbol || '$')}" maxlength="3"></label>
+      <label>Town tax on pay (%)<input id="st-tax" inputmode="decimal" value="${rate('taxRate')}"></label>
+      <label>Savings interest (%)<input id="st-sav" inputmode="decimal" value="${rate('savingsRate')}"></label>
+      <label>Default loan interest (%)<input id="st-loan" inputmode="decimal" value="${rate('loanRate')}"></label>
+      <label>Banker PIN<input id="st-pin" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" value="${esc(s.bankerPin || '')}" required></label></div>
+      <div><button class="btn">Save rules</button></div></form></section>`;
+  }
+  return '';
+}
+
+function viewModal() {
+  if (S.pin) {
+    const d = S.pin.digits;
+    return `<div class="overlay"><div class="dialog"><h3 style="text-align:center">${S.pin.target === 'bank' ? 'Banker PIN' : 'Hi ' + esc(nameOf(S.pin.target)) + ', enter your PIN'}</h3>
+      <div class="dots">${[0, 1, 2, 3].map(i => `<i class="${i < d.length ? 'on' : ''}"></i>`).join('')}</div>
+      ${S.pin.wrong ? '<p class="neg" style="text-align:center">That’s not it. Try again.</p>' : ''}
+      <div class="pad">${[1,2,3,4,5,6,7,8,9].map(n => `<button data-act="digit" data-id="${n}">${n}</button>`).join('')}<button data-act="pinCancel" style="font-size:1rem">Cancel</button><button data-act="digit" data-id="0">0</button><button data-act="digitBack" style="font-size:1rem">Delete</button></div></div></div>`;
+  }
+  if (S.modal) return `<div class="overlay"><div class="dialog"><h3>${esc(S.modal.title)}</h3><p class="muted">${esc(S.modal.body)}</p>
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-act="modalNo">Cancel</button><button class="btn ${S.modal.danger ? 'danger' : 'gold'}" data-act="modalYes">${esc(S.modal.ok)}</button></div></div></div>`;
+  return '';
+}
+const confirmIt = (title, body, ok, fn, danger) => { S.modal = {title, body, ok, fn, danger}; render(); };
+
+// ---------- actions ----------
+function enter(target) {
+  S.pin = null; S.me = target; S.tab = null;
+  if (target !== 'bank') ls('ptb.me', target); else ls('ptb.me', null);
+  window.scrollTo(0, 0); render();
+}
+const acts = {
+  pick: id => { const p = S.players[id]; if (p?.pin) { S.pin = {target: id, digits: ''}; render(); } else enter(id); },
+  pickBank: () => { if (S.settings.bankerPin) { S.pin = {target: 'bank', digits: ''}; render(); } else enter('bank'); },
+  digit: d => {
+    const P = S.pin; if (!P || P.digits.length >= 4) return;
+    P.digits += d; P.wrong = false;
+    if (P.digits.length === 4) {
+      const want = P.target === 'bank' ? S.settings.bankerPin : S.players[P.target]?.pin;
+      if (P.digits === String(want)) return enter(P.target);
+      P.digits = ''; P.wrong = true;
+    }
+    render();
+  },
+  digitBack: () => { if (S.pin) { S.pin.digits = S.pin.digits.slice(0, -1); render(); } },
+  pinCancel: () => { S.pin = null; render(); },
+  switch: () => { S.me = null; ls('ptb.me', null); render(); },
+  tab: id => { S.tab = id; window.scrollTo(0, 0); render(); },
+  modalNo: () => { S.modal = null; render(); },
+  modalYes: () => { const f = S.modal?.fn; S.modal = null; render(); if (f) run(f); },
+  buy: id => run(async () => {
+    const it = S.items[id]; if (!it) fail('That item is gone.');
+    const shop = S.shops[it.shopId]; if (!shop) fail('That shop closed.');
+    const qty = parseInt(val('q-' + id), 10); if (!(qty >= 1)) fail('Choose how many to buy.');
+    if (it.stock != null && it.stock < qty) fail(`Only ${it.stock} left.`);
+    const total = it.price * qty;
+    if (bal(balances(), S.me, 'c') < total) fail(`Not enough in checking. You need ${money(total)}.`);
+    await addTx(S.me + '.c', shop.ownerId + '.c', total, 'purchase', `${qty} × ${it.name} at ${shop.name}`);
+    if (it.stock != null) await db.doc('items/' + id).update({stock: it.stock - qty});
+    await db.collection('orders').add({shopId: shop.id, itemId: id, itemName: it.name, qty, price: it.price, total, buyerId: S.me, sellerId: shop.ownerId, status: 'new', at: Date.now()});
+    clear('q-' + id); toast(`Ordered ${qty} × ${it.name}`);
+  }),
+  deliver: id => run(async () => { await db.doc('orders/' + id).update({status: 'done'}); toast('Marked delivered'); }),
+  refund: id => {
+    const o = S.orders.find(x => x.id === id); if (!o) return;
+    confirmIt('Refund this order?', `${money(o.total)} goes back to ${nameOf(o.buyerId)} from your checking.`, 'Refund', async () => {
+      if (bal(balances(), o.sellerId, 'c') < o.total) fail('Not enough in your checking to refund.');
+      await addTx(o.sellerId + '.c', o.buyerId + '.c', o.total, 'refund', `Refund: ${o.qty} × ${o.itemName}`);
+      await db.doc('orders/' + id).update({status: 'refunded'});
+      const it = S.items[o.itemId]; if (it && it.stock != null) await db.doc('items/' + o.itemId).update({stock: it.stock + o.qty});
+      toast('Refunded');
+    });
+  },
+  removeItem: id => confirmIt('Remove this item?', `${S.items[id]?.name || 'It'} will come off the price list.`, 'Remove', async () => { await db.doc('items/' + id).delete(); }, true),
+  closeShop: id => confirmIt('Close this shop?', 'Its items come off Main Street. Past sales stay in the records.', 'Close shop', async () => {
+    for (const i of Object.values(S.items).filter(i => i.shopId === id)) await db.doc('items/' + i.id).delete();
+    await db.doc('shops/' + id).delete(); toast('Shop closed');
+  }, true),
+  decline: id => run(async () => { await db.doc('loans/' + id).update({status: 'declined'}); toast('Loan declined'); }),
+  missed: id => confirmIt('Record a missed payment?', `This lowers ${nameOf(S.loans[id]?.playerId)}'s credit score by 60 points.`, 'Record it', async () => {
+    await db.doc('loans/' + id).update({missed: (S.loans[id].missed || 0) + 1}); toast('Missed payment recorded');
+  }, true),
+  payday: () => {
+    const ps = playerList().filter(p => (p.wage || 0) > 0);
+    confirmIt('Run payday?', `${ps.length} paychecks will be deposited to checking.`, 'Pay everyone', async () => {
+      const tr = rate('taxRate');
+      for (const p of ps) { const tax = Math.round(p.wage * tr / 100); await addTx('bank', p.id + '.c', p.wage - tax, 'pay', `Paycheck: ${p.job || 'Wages'} (${money(p.wage)} gross, ${money(tax)} tax)`, {gross: p.wage, tax}); }
+      await db.doc('town/settings').update({lastPayday: Date.now(), paydays: (S.settings.paydays || 0) + 1});
+      toast('Payday done. Everyone got paid.');
+    });
+  },
+  interest: () => confirmIt('Run interest day?', 'Loans grow by their rate, and savings accounts earn interest.', 'Run it', async () => {
+    const b = balances(), sr = rate('savingsRate');
+    for (const l of Object.values(S.loans).filter(l => l.status === 'active')) {
+      const i = Math.round(l.balance * l.rate / 100); if (i > 0) await db.doc('loans/' + l.id).update({balance: l.balance + i, interest: (l.interest || 0) + i});
+    }
+    for (const p of playerList()) { const i = Math.round(bal(b, p.id, 's') * sr / 100); if (i > 0) await addTx('bank', p.id + '.s', i, 'interest', `Savings interest at ${sr}%`); }
+    await db.doc('town/settings').update({lastInterest: Date.now()});
+    toast('Interest day done');
+  }),
+  delPlayer: id => confirmIt(`Remove ${nameOf(id)}?`, 'They leave town. Their past transactions stay in the ledger.', 'Remove', async () => {
+    await db.doc('players/' + id).delete(); toast('Resident removed');
+  }, true),
+};
+
+const forms = {
+  setup: async () => {
+    const pin = val('su-pin'); if (!/^\d{4}$/.test(pin)) fail('The banker PIN needs 4 digits.');
+    await db.doc('town/settings').set({name: val('su-name').trim(), symbol: val('su-sym').trim() || '$', bankerPin: pin, taxRate: 10, savingsRate: 2, loanRate: 5, paydays: 0, createdAt: Date.now()});
+    S.me = 'bank'; S.tab = 'people'; toast('Your bank is open. Add your residents.');
+  },
+  check: async () => {
+    const to = val('ck-to'), amt = toCents(val('ck-amt'));
+    if (!S.players[to]) fail('Choose who to pay.');
+    if (!(amt > 0)) fail('Write an amount bigger than zero.');
+    if (bal(balances(), S.me, 'c') < amt) fail('Not enough in checking for that check.');
+    await addTx(S.me + '.c', to + '.c', amt, 'check', val('ck-memo').trim() || 'Check to ' + nameOf(to));
+    clear('ck-to', 'ck-amt', 'ck-memo'); toast(`Check sent to ${nameOf(to)}`);
+  },
+  move: async () => {
+    const dir = val('mv-dir'), amt = toCents(val('mv-amt')), from = dir === 's' ? 'c' : 's';
+    if (!(amt > 0)) fail('Enter an amount bigger than zero.');
+    if (bal(balances(), S.me, from) < amt) fail(`Not enough in ${from === 'c' ? 'checking' : 'savings'}.`);
+    await addTx(S.me + '.' + from, S.me + '.' + dir, amt, 'move', dir === 's' ? 'Moved to savings' : 'Moved to checking');
+    clear('mv-amt'); toast('Money moved');
+  },
+  openShop: async () => {
+    await db.collection('shops').add({name: val('os-name').trim(), desc: val('os-desc').trim(), ownerId: S.me, at: Date.now()});
+    toast('Your shop is open');
+  },
+  addItem: async () => {
+    const shop = Object.values(S.shops).find(s => s.ownerId === S.me); if (!shop) fail('Open a shop first.');
+    const price = toCents(val('ai-price')); if (!(price >= 0)) fail('Enter a price.');
+    const st = val('ai-stock').trim();
+    await db.collection('items').add({shopId: shop.id, name: val('ai-name').trim(), price, stock: st === '' ? null : Math.max(0, parseInt(st, 10)), at: Date.now()});
+    clear('ai-name', 'ai-price', 'ai-stock'); toast('Item added');
+  },
+  editItem: async id => {
+    const price = toCents(val('ei-p-' + id)); if (!(price >= 0)) fail('Enter a price.');
+    const st = val('ei-s-' + id).trim();
+    await db.doc('items/' + id).update({price, stock: st === '' ? null : Math.max(0, parseInt(st, 10))});
+    clear('ei-p-' + id, 'ei-s-' + id); toast('Saved');
+  },
+  request: async () => {
+    const amt = toCents(val('lr-amt')), cr = credit(S.me);
+    if (!(amt > 0)) fail('Enter how much you want to borrow.');
+    if (amt > cr.avail) fail(`Your credit limit lets you borrow up to ${money(cr.avail)}.`);
+    await db.collection('loans').add({playerId: S.me, amount: amt, purpose: val('lr-why').trim(), rate: rate('loanRate'), balance: 0, interest: 0, payments: 0, missed: 0, status: 'requested', at: Date.now()});
+    clear('lr-amt', 'lr-why'); toast('Sent to the banker');
+  },
+  repay: async id => {
+    const l = S.loans[id], amt = toCents(val('rp-' + id));
+    if (!l || l.status !== 'active') fail('That loan isn’t active.');
+    if (!(amt > 0)) fail('Enter an amount to pay.');
+    if (amt > l.balance) fail(`You only owe ${money(l.balance)}.`);
+    if (bal(balances(), S.me, 'c') < amt) fail('Not enough in checking.');
+    await addTx(S.me + '.c', 'bank', amt, 'repay', `Loan payment: ${l.purpose || 'loan'}`);
+    const left = l.balance - amt;
+    await db.doc('loans/' + id).update({balance: left, payments: (l.payments || 0) + 1, status: left <= 0 ? 'paid' : 'active'});
+    clear('rp-' + id); toast(left <= 0 ? 'Loan paid off! Your credit score went up.' : 'Payment made');
+  },
+  approve: async id => {
+    const l = S.loans[id], r = parseFloat(val('la-' + id)); if (!l) fail('That request is gone.');
+    if (!(r >= 0)) fail('Enter an interest rate.');
+    await addTx('bank', l.playerId + '.c', l.amount, 'loan', `Loan: ${l.purpose || 'loan'}`);
+    await db.doc('loans/' + id).update({status: 'active', rate: r, balance: l.amount, approvedAt: Date.now()});
+    toast(`Loan approved for ${nameOf(l.playerId)}`);
+  },
+  adjust: async () => {
+    const who = val('ad-who'), acct = val('ad-acct'), give = val('ad-dir') === 'give', amt = toCents(val('ad-amt'));
+    if (!S.players[who]) fail('Choose a resident.');
+    if (!(amt > 0)) fail('Enter an amount.');
+    const memo = val('ad-memo').trim() || (give ? 'Bonus from the bank' : 'Fine');
+    await addTx(give ? 'bank' : who + '.' + acct, give ? who + '.' + acct : 'bank', amt, 'adjust', memo);
+    clear('ad-amt', 'ad-memo'); toast(give ? 'Money given' : 'Money taken');
+  },
+  addPlayer: async () => {
+    const pin = val('np-pin').trim(); if (pin && !/^\d{4}$/.test(pin)) fail('A PIN needs exactly 4 digits.');
+    const wage = toCents(val('np-wage') || '0'), start = toCents(val('np-start') || '0');
+    const ref = db.collection('players').doc();
+    await ref.set({name: val('np-name').trim(), job: val('np-job').trim(), wage: wage > 0 ? wage : 0, pin, createdAt: Date.now()});
+    if (start > 0) await addTx('bank', ref.id + '.c', start, 'adjust', 'Welcome to town');
+    clear('np-name', 'np-job', 'np-wage', 'np-start', 'np-pin'); toast('Resident added');
+  },
+  editPlayer: async id => {
+    const pin = val('ep-p-' + id).trim(); if (pin && !/^\d{4}$/.test(pin)) fail('A PIN needs exactly 4 digits.');
+    const wage = toCents(val('ep-w-' + id) || '0');
+    await db.doc('players/' + id).update({name: val('ep-n-' + id).trim(), job: val('ep-j-' + id).trim(), wage: wage > 0 ? wage : 0, pin});
+    clear('ep-n-' + id, 'ep-j-' + id, 'ep-w-' + id, 'ep-p-' + id); toast('Saved');
+  },
+  settings: async () => {
+    const pin = val('st-pin'); if (!/^\d{4}$/.test(pin)) fail('The banker PIN needs 4 digits.');
+    const n = k => { const v = parseFloat(val(k)); return isFinite(v) && v >= 0 ? v : 0; };
+    await db.doc('town/settings').update({name: val('st-name').trim(), symbol: val('st-sym').trim() || '$', taxRate: n('st-tax'), savingsRate: n('st-sav'), loanRate: n('st-loan'), bankerPin: pin});
+    clear('st-name', 'st-sym', 'st-tax', 'st-sav', 'st-loan', 'st-pin'); toast('Rules saved');
+  },
+};
+
+app.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  e.preventDefault();
+  const fn = acts[el.dataset.act]; if (fn) fn(el.dataset.id);
+});
+app.addEventListener('submit', e => {
+  const f = e.target.closest('form[data-form]'); if (!f) return;
+  e.preventDefault();
+  const fn = forms[f.dataset.form]; if (fn) run(() => fn(f.dataset.id));
+});
+
+// ---------- boot ----------
+(async () => {
+  const timer = setTimeout(() => { S.slow = true; render(); }, 10000);
+  try {
+    if (window.firebase && FIREBASE_CONFIG && FIREBASE_CONFIG.projectId) { firebase.initializeApp(FIREBASE_CONFIG); db = firebase.firestore(); }
+  } catch (e) { console.error(e); db = null; }
+  if (!db) { clearTimeout(timer); S.dbState = 'none'; render(); return; }
+  S.dbState = 'ok';
+  const remembered = ls('ptb.me'); if (remembered) S.me = remembered;
+  const onErr = e => { S.err = e.code; clearTimeout(timer); schedule(); };
+  db.doc('town/settings').onSnapshot(s => {
+    S.settings = s.exists ? s.data() : null;
+    if (!s.metadata.fromCache) { S.settingsConfirmed = true; clearTimeout(timer); S.slow = false; }
+    schedule();
+  }, onErr);
+  const map = (name, key) => db.collection(name).onSnapshot(q => { const o = {}; q.docs.forEach(d => o[d.id] = {id: d.id, ...d.data()}); S[key] = o; schedule(); }, onErr);
+  const list = (name, key) => db.collection(name).onSnapshot(q => { S[key] = q.docs.map(d => ({id: d.id, ...d.data()})).sort((a, b) => b.at - a.at); schedule(); }, onErr);
+  map('players', 'players'); list('tx', 'tx'); map('shops', 'shops'); map('items', 'items'); list('orders', 'orders'); map('loans', 'loans');
+  render();
+})();
+})();
+</script>
+</body></html>
