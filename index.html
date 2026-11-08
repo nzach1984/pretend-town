@@ -149,7 +149,7 @@ td.num{white-space:nowrap}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);padding:12px 18px;border-radius:12px;font-weight:600;z-index:30;max-width:calc(100% - 32px);box-shadow:0 10px 30px rgba(0,0,0,.3)}
 .toast.err{background:var(--bad);color:#fff}
 .center{min-height:60vh;display:grid;place-items:center;text-align:center;padding:20px}
-@media (prefers-reduced-motion:no-preference){.acct,.panel{animation:rise .3s ease-out both}@keyframes rise{from{transform:translateY(6px)}to{transform:none}}}
+@media (prefers-reduced-motion:no-preference){.anim .acct,.anim .panel{animation:rise .3s ease-out both}@keyframes rise{from{transform:translateY(6px)}to{transform:none}}}
 .daychip{font-family:var(--f-num);font-size:.8rem;padding:2px 8px;border-radius:999px;background:var(--coin);color:#1b1205;margin-right:6px;white-space:nowrap}
 .alert{border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 10%,var(--card));border-radius:12px;padding:12px 14px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 .alert.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,var(--card))}
@@ -225,26 +225,25 @@ const app = document.getElementById('app');
 let db = null;
 const S = {
   dbState: 'loading', settings: undefined, settingsConfirmed: false,
-  players: {}, tx: [], shops: {}, items: {}, orders: [], loans: {}, bills: [], holdings: [], teller: [], cds: [], messages: [], thread: null, ledgerWho: '', inspectType: {}, inspectSurprise: false, inspecting: null, paperDay: null, picks: [], reveal: null, hotelDay: {}, lottoTickets: [], gigs: [],
+  players: {}, tx: [], shops: {}, items: {}, orders: [], loans: {}, bills: [], holdings: [], teller: [], cds: [], messages: [], thread: null, ledgerWho: '', recipeDraft: {}, editRecipe: null, inspectType: {}, inspectSurprise: false, inspecting: null, paperDay: null, picks: [], reveal: null, hotelDay: {}, lottoTickets: [], gigs: [],
   me: null, tab: null, modal: null, pin: null, toast: null, busy: false, err: null, slow: false,
 };
 const COLORS = ['#2F7D6B','#C0612B','#5B5BB5','#B0457A','#3C7FB0','#8A6D1F','#6C8A2E','#9C4BB3'];
 const DEFAULTS = {day: 1, payEvery: 3, billEvery: 4, billGrace: 2, interestEvery: 7, lateFee: 200, taxRate: 10, savingsRate: 2, loanRate: 5,
   rentEvery: 7, mortgageRate: 2, mortgageTerm: 10, downPct: 20, cdRate: 8, cdDays: 7, cdPenalty: 10, eventChance: 35,
   lotteryPrice: 100, lotteryEvery: 3, lotteryMax: 20, lotteryShare: 50, lotterySeed: 1000, gigsPerDay: 3, stockSwing: 8, surpriseChance: 0, renewPct: 50,
-  pick3Price: 200, pick3Max: 12, pick3Share: 40, pick3Seed: 5000, pick3Match2: 400, pick3Match1: 100, pick3Boost: 1000, scratchPrice: 100, auditChance: 15, auditFine: 300, auditDays: 1, scratchLimit: 5, marketChance: 10, bizLimit: 2, auditPass: 3, wholesalePct: 50, homeGrace: 1, profitShare: 20, dividendEvery: 7, needsCount: 3, needsBonus: 300, needsPenalty: 100, stampReward: 200, farmDiscount: 20, autoMinutes: 15, inspectDays: 1};
+  pick3Price: 200, pick3Max: 12, pick3Share: 40, pick3Seed: 5000, pick3Match2: 400, pick3Match1: 100, pick3Boost: 1000, scratchPrice: 100, auditChance: 15, auditFine: 300, auditDays: 1, scratchLimit: 5, marketChance: 10, bizLimit: 2, auditPass: 3, wholesalePct: 50, homeGrace: 1, profitShare: 20, dividendEvery: 7, needsCount: 3, needsBonus: 300, needsPenalty: 100, stampReward: 200, farmDiscount: 20, autoMinutes: 15, inspectDays: 1, jailDays: 3, bailAmount: 5000, jailProblems: 20};
 const DEFAULT_UTIL = [{name: 'Electric', amount: 800}, {name: 'Water', amount: 500}, {name: 'Internet', amount: 600}];
 const DEFAULT_HOMES = [{name: 'Apartment', rent: 1000, price: 15000}, {name: 'Townhouse', rent: 1600, price: 25000}, {name: 'House with a yard', rent: 2400, price: 40000}];
 const SHARES = 20;
 const BIZ = {
-  shop: {noun: 'shop', Noun: 'Shop', list: 'Price list', item: 'Item', buy: 'Buy', done: 'Delivered', waiting: 'Waiting for delivery', ph: 'Lemonade Stand', php: 'Fresh lemonade and cookies', iph: 'Cookie', cogs: true, tips: false, awning: 'var(--note)', always: 'Always in stock', stockLbl: 'Stock', blurb: 'Sell things to the rest of town'},
-  restaurant: {noun: 'restaurant', Noun: 'Restaurant', list: 'Menu', item: 'Dish', buy: 'Order', done: 'Served', waiting: 'Waiting to be served', ph: 'The Hungry Moose Diner', php: 'Pancakes, burgers and milkshakes', iph: 'Cheeseburger', cogs: true, tips: true, awning: 'var(--bad)', always: 'On the menu', stockLbl: 'Servings', blurb: 'Cook and serve meals; customers can tip'},
-  service: {noun: 'service business', Noun: 'Service', list: 'Services', item: 'Service', buy: 'Book', done: 'Completed', waiting: 'Booked, waiting for service', ph: 'Sparkle Car Wash', php: 'Car washes, haircuts, tutoring', iph: 'Full car wash', tips: true, awning: '#3C7FB0', always: 'Open for booking', stockLbl: 'Time slots', blurb: 'Do jobs for people like haircuts or car washes; customers can tip'},
-  entertainment: {noun: 'entertainment venue', Noun: 'Entertainment', list: 'Tickets', item: 'Ticket', buy: 'Get tickets', done: 'Admitted', waiting: 'Tickets ready to use', ph: 'Starlight Movie Theater', php: 'Movies, an arcade, or a mini zoo', iph: 'Movie ticket', tips: false, awning: '#9C4BB3', always: 'Plenty of seats', stockLbl: 'Seats', blurb: 'Sell tickets to movies, shows, games or rides'},
-  doctor: {noun: 'doctor’s office', Noun: 'Doctor’s office', list: 'Treatments', item: 'Treatment', buy: 'Book visit', done: 'Treated', waiting: 'Waiting to see the doctor', ph: 'Main Street Clinic', php: 'Checkups, bandages and flu shots', iph: 'Checkup', tips: false, awning: '#C0612B', always: 'Open for visits', stockLbl: 'Appointments', blurb: 'Treat patients; residents’ doctor bills get paid to you'},
-  repair: {noun: 'repair shop', Noun: 'Repair shop', list: 'Repairs', item: 'Repair', buy: 'Book repair', done: 'Fixed', waiting: 'Waiting for the repair', ph: 'Fix-It Garage', php: 'Bikes, cars, phones and windows', iph: 'Fix a flat tire', tips: true, awning: '#8A6D1F', always: 'Taking jobs', stockLbl: 'Time slots', blurb: 'Fix things; residents’ repair bills get paid to you'},
-  hotel: {noun: 'hotel', Noun: 'Hotel', list: 'Rooms', item: 'Room type', buy: 'Book', done: 'Checked in', waiting: 'Room booked', ph: 'Grand Pine Hotel', php: 'Cozy rooms, a pool and free breakfast', iph: 'Standard room', tips: false, awning: '#2F7D6B', always: '', stockLbl: 'Number of rooms', blurb: 'Rent rooms by the night; tourists fill some rooms', hotel: true, bankOnly: true},
-  farm: {noun: 'farm stand', Noun: 'Farm stand', list: 'Produce', item: 'Produce', buy: 'Buy', done: 'Picked up', waiting: 'Ready for pickup', ph: 'Sunny Acres Farm', php: 'Fresh eggs, apples and flowers', iph: 'Dozen eggs', cogs: true, tips: false, awning: '#6C8A2E', always: 'Plenty in the field', stockLbl: 'Amount', blurb: 'Grow and sell fresh food and flowers'},
+  shop: {noun: 'shop', Noun: 'Shop', list: 'Price list', item: 'Item', buy: 'Buy', done: 'Delivered', waiting: 'Waiting for delivery', ph: 'Lemonade Stand', php: 'Fresh lemonade and cookies', iph: 'Cookie', cogs: true, tips: false, awning: 'var(--note)', always: 'Always in stock', stockLbl: 'Made per day', daily: true, blurb: 'Sell things to the rest of town'},
+  restaurant: {noun: 'restaurant', Noun: 'Restaurant', list: 'Menu', item: 'Dish', buy: 'Order', done: 'Served', waiting: 'Waiting to be served', ph: 'The Hungry Moose Diner', php: 'Pancakes, burgers and milkshakes', iph: 'Cheeseburger', cogs: true, tips: true, awning: 'var(--bad)', always: 'On the menu', stockLbl: 'Servings per day', daily: true, blurb: 'Cook and serve meals; customers can tip'},
+  service: {noun: 'service business', Noun: 'Service', list: 'Services', item: 'Service', buy: 'Book', done: 'Completed', waiting: 'Booked, waiting for service', ph: 'Sparkle Car Wash', php: 'Car washes, haircuts, tutoring', iph: 'Full car wash', tips: true, awning: '#3C7FB0', always: 'Open for booking', stockLbl: 'Slots per day', daily: true, blurb: 'Do jobs for people like haircuts or car washes; customers can tip'},
+  entertainment: {noun: 'entertainment venue', Noun: 'Entertainment', list: 'Tickets', item: 'Ticket', buy: 'Get tickets', done: 'Admitted', waiting: 'Tickets ready to use', ph: 'Starlight Movie Theater', php: 'Movies, an arcade, or a mini zoo', iph: 'Movie ticket', tips: false, awning: '#9C4BB3', always: 'Plenty of seats', stockLbl: 'Seats per day', daily: true, blurb: 'Sell tickets to movies, shows, games or rides'},
+  doctor: {noun: 'doctor’s office', Noun: 'Doctor’s office', list: 'Treatments', item: 'Treatment', buy: 'Book visit', done: 'Treated', waiting: 'Waiting to see the doctor', ph: 'Main Street Clinic', php: 'Checkups, bandages and flu shots', iph: 'Checkup', tips: false, awning: '#C0612B', always: 'Open for visits', stockLbl: 'Appointments per day', daily: true, blurb: 'Treat patients; residents’ doctor bills get paid to you'},
+  repair: {noun: 'repair shop', Noun: 'Repair shop', list: 'Repairs', item: 'Repair', buy: 'Book repair', done: 'Fixed', waiting: 'Waiting for the repair', ph: 'Fix-It Garage', php: 'Bikes, cars, phones and windows', iph: 'Fix a flat tire', tips: true, awning: '#8A6D1F', always: 'Taking jobs', stockLbl: 'Slots per day', daily: true, blurb: 'Fix things; residents’ repair bills get paid to you'},
+  farm: {noun: 'farm stand', Noun: 'Farm stand', list: 'Produce', item: 'Produce', buy: 'Buy', done: 'Picked up', waiting: 'Ready for pickup', ph: 'Sunny Acres Farm', php: 'Fresh eggs, apples and flowers', iph: 'Dozen eggs', cogs: true, tips: false, awning: '#6C8A2E', always: 'Plenty in the field', stockLbl: 'Harvest per day', daily: true, blurb: 'Grow and sell fresh food and flowers'},
 };
 const EVENTS = [
   {t: 'Town Fair', x: 'Everyone wins a {a} prize at the fair.', e: 'bonusAll', a: 500},
@@ -280,9 +279,9 @@ const GRADE_CLS = {A: 'good', B: 'note', C: 'warn', D: 'warn', F: 'bad'};
 const GRADE_PRICE = {A: 1.05, B: 1, C: .97, D: .92, F: .8};
 const licExpired = sh => sh.license?.status === 'expired';
 const failedInsp = sh => ['D', 'F'].includes(sh?.inspection?.grade);
-const isOpenBiz = sh => !failedInsp(sh) && !licExpired(sh);
+const isOpenBiz = sh => !failedInsp(sh) && !licExpired(sh) && !inJail(sh.ownerId);
 const FAIL_GRADES = ['D', 'F'];
-const closedWhy = sh => failedInsp(sh) ? `Closed after failing inspection (grade ${sh.inspection?.grade || 'D'})` : licExpired(sh) ? 'Closed: license expired' : '';
+const closedWhy = sh => inJail(sh.ownerId) ? 'Closed: the owner is in jail' : failedInsp(sh) ? `Closed after failing inspection (grade ${sh.inspection?.grade || 'D'})` : licExpired(sh) ? 'Closed: license expired' : '';
 const inspOverdue = sh => sh.inspection?.nextDue != null && sh.inspection.nextDue < today();
 // Hotels: tourists fill part of each room type every night. Same numbers on every device.
 const hotelDay = sid => { const d = S.hotelDay?.[sid]; return d && d >= today() ? d : today(); };
@@ -342,8 +341,8 @@ async function finishAudit(pid, audit, day) {
 }
 async function doAudits(day) {
   const out = [];
-  for (const p of playerList().filter(p => auditPending(p.id) && auditOf(p.id).dueDay < day)) { await finishAudit(p.id, auditOf(p.id), day); out.push('an overdue audit closed'); }
-  const pool = ownersList().filter(p => !auditPending(p.id));
+  for (const p of playerList().filter(p => !p.jail && auditPending(p.id) && auditOf(p.id).dueDay < day)) { await finishAudit(p.id, auditOf(p.id), day); out.push('an overdue audit closed'); }
+  const pool = ownersList().filter(p => !auditPending(p.id) && !p.jail);
   if (pool.length && Math.random() * 100 < cfg('auditChance')) { const p = pickRandom(pool); await startAudit(p.id, day); out.push('a surprise tax audit'); }
   return out.join(', ');
 }
@@ -395,10 +394,106 @@ function parseRecipe(text) {
   }
   return out.slice(0, 5);
 }
+// Bill of materials picker: ingredients are chosen from what other businesses sell.
+const ingredientCatalog = ownerId => { const m = {}; Object.values(S.items).forEach(i => { const sh = S.shops[i.shopId]; if (!sh || sh.ownerId === ownerId || bizType(sh) === 'hotel') return; const k = ingKey(i.name); if (k && !m[k]) m[k] = i.name; }); return m; };
+const ownerForFk = fk => fk.startsWith('new-') ? S.shops[fk.slice(4)]?.ownerId : S.shops[S.items[fk.slice(3)]?.shopId]?.ownerId;
+function draftFor(fk, initial) { if (!S.recipeDraft[fk]) S.recipeDraft[fk] = (initial || []).map(r => ({key: r.key, name: r.name, qty: r.qty})); return S.recipeDraft[fk]; }
+function syncDraft(fk) { (S.recipeDraft[fk] || []).forEach((r, i) => { const k = document.getElementById(`rc-${fk}-${i}-k`), q = document.getElementById(`rc-${fk}-${i}-q`); if (k) r.key = k.value; if (q) r.qty = Math.max(1, Math.min(20, parseInt(q.value, 10) || 1)); }); }
+const draftIds = fk => (S.recipeDraft[fk] || []).flatMap((_, i) => [`rc-${fk}-${i}-k`, `rc-${fk}-${i}-q`]);
+function recipeBuilder(fk, ownerId, initial) {
+  const cat = ingredientCatalog(ownerId); (initial || []).forEach(r => { if (!cat[r.key]) cat[r.key] = r.name; });
+  const rows = draftFor(fk, initial), keys = Object.keys(cat).sort((a, b) => cat[a].localeCompare(cat[b]));
+  return `<div style="display:grid;gap:6px">${rows.map((r, i) => `<div class="inline" style="align-items:center;flex-wrap:nowrap"><select id="rc-${fk}-${i}-k" style="flex:1;min-width:0" aria-label="Ingredient ${i + 1}">${keys.map(k => `<option value="${k}" ${k === r.key ? 'selected' : ''}>${esc(cat[k])}</option>`).join('')}</select><input id="rc-${fk}-${i}-q" type="number" min="1" max="20" value="${r.qty}" style="width:72px" aria-label="How many"><button type="button" class="btn ghost sm" data-act="recDel" data-id="${fk}:${i}" aria-label="Remove ingredient">✕</button></div>`).join('')}
+    ${keys.length ? (rows.length < 5 ? `<div><button type="button" class="btn ghost sm" data-act="recAdd" data-id="${fk}">+ Add ingredient</button></div>` : '') : '<p class="muted" style="font-size:.85rem">No other business sells anything yet, so there’s nothing to pick. Once someone lists carrots or flour, they show up here.</p>'}</div>`;
+}
+function draftRecipe(fk) {
+  syncDraft(fk); const cat = ingredientCatalog(ownerForFk(fk)), out = [];
+  (S.recipeDraft[fk] || []).forEach(r => { if (!r.key) return; const ex = out.find(x => x.key === r.key); if (ex) ex.qty = Math.min(20, ex.qty + r.qty); else out.push({key: r.key, name: cat[r.key] || r.name || r.key, qty: r.qty}); });
+  return out.slice(0, 5);
+}
 const recipeText = r => (r || []).map(x => `${x.name} x${x.qty}`).join(', ');
 const pantryOf = sh => sh?.pantry || {};
 const canMake = (sh, item) => !item?.recipe?.length ? Infinity : Math.min(...item.recipe.map(r => Math.floor((pantryOf(sh)[r.key] || 0) / r.qty)));
-const sellersOf = (key, notOwner) => Object.values(S.items).filter(i => ingKey(i.name) === key && (i.stock == null || i.stock > 0)).map(i => ({item: i, shop: S.shops[i.shopId]})).filter(x => x.shop && x.shop.ownerId !== notOwner && isOpenBiz(x.shop) && bizType(x.shop) !== 'hotel');
+const sellersOf = (key, notOwner) => Object.values(S.items).filter(i => ingKey(i.name) === key).map(i => ({item: i, shop: S.shops[i.shopId]})).filter(x => x.shop && x.shop.ownerId !== notOwner && isOpenBiz(x.shop) && bizType(x.shop) !== 'hotel' && (isDaily(x.shop) ? slotsLeft(x.item) > 0 : (x.item.stock == null || x.item.stock > 0)));
+// Service-type businesses have a daily capacity that resets each game day.
+const isDaily = sh => !!BIZ[bizType(sh)]?.daily;
+const DEFAULT_SLOTS = 5;
+const slotsCap = it => it.stock == null || it.stock < 1 ? DEFAULT_SLOTS : it.stock;
+const slotsUsed = (itemId, day) => S.orders.filter(o => o.itemId === itemId && o.day === day && o.status !== 'refunded').reduce((a, o) => a + (o.qty || 0), 0)
+  + S.tx.filter(t => t.kind === 'supply' && t.ingItemId === itemId && t.day === day && !t.reversed).reduce((a, t) => a + (t.qty || 0), 0);
+const outToday = T => T.cogs ? 'Sold out today. More tomorrow!' : 'Fully booked today. Come back tomorrow!';
+const slotsLeft = it => Math.max(0, slotsCap(it) - slotsUsed(it.id, today()));
+// Town jail: 3 days without a home lands you in jail. Pay bail or finish work release (math problems) to get out.
+const inJail = pid => !!S.players[pid]?.jail;
+const jailStays = pid => Number(S.players[pid]?.jailCount || 0);
+const restr = pid => S.players[pid]?.restrict || {};
+const noLottery = pid => !!restr(pid).lotteryBan || (restr(pid).lotteryUntil ?? 0) >= today();
+const noLoans = pid => (restr(pid).loansUntil ?? 0) >= today();
+const noNewBiz = pid => (restr(pid).bizUntil ?? 0) >= today();
+const noStocks = pid => (restr(pid).stocksUntil ?? 0) >= today();
+function consequenceFor(n) {
+  const d = today();
+  if (n >= 3) return {r: {lotteryBan: true, loansUntil: d + 7, bizUntil: d + 7, stocksUntil: d + 7}, text: 'Banned from the lottery until the banker clears your record. No loans, new businesses or stock buying for 7 days.'};
+  if (n === 2) return {r: {lotteryUntil: d + 7, loansUntil: d + 5, bizUntil: d + 5}, text: 'No lottery for 7 days. No new loans or businesses for 5 days.'};
+  return {r: {lotteryUntil: d + 3}, text: 'No lottery for 3 days.'};
+}
+function restrictText(pid) {
+  const r = restr(pid), d = today(), out = [];
+  if (r.lotteryBan) out.push('banned from the lottery'); else if ((r.lotteryUntil ?? 0) >= d) out.push(`no lottery through Day ${r.lotteryUntil}`);
+  if ((r.loansUntil ?? 0) >= d) out.push(`no loans through Day ${r.loansUntil}`);
+  if ((r.bizUntil ?? 0) >= d) out.push(`no new businesses through Day ${r.bizUntil}`);
+  if ((r.stocksUntil ?? 0) >= d) out.push(`no stock buying through Day ${r.stocksUntil}`);
+  return out;
+}
+const jailDeadline = p => (p.homelessSince ?? today()) + Math.max(1, Math.round(cfg('jailDays'))) - 1;
+function jailProblem(pid) { const [q, raw] = makeProblem(levelFor(pid, 350)); return {q, a: Math.round(raw * 100) / 100}; }
+async function sendToJail(p, day, patch) {
+  const stay = Number(p.jailCount || 0) + 1, pr = jailProblem(p.id);
+  const needed = Math.max(1, Math.round(cfg('jailProblems'))) + 10 * (Math.min(stay, 3) - 1), bail = cfg('bailAmount') * Math.min(stay, 3);
+  await db.doc('players/' + p.id).update({jail: {since: day, solved: 0, needed, wrong: 0, bail, stay, q: pr.q, a: pr.a}, jailCount: stay});
+  await sendMsg('bank', p.id, `You went ${Math.round(cfg('jailDays'))} days without a home, so you’re in the Town Jail${stay > 1 ? ` (stay #${stay})` : ''}. Pay ${money(bail)} bail or finish ${needed} work release problems to get out. While you’re in jail you get no paychecks and your businesses are closed. When you get out: ${consequenceFor(stay).text}`, day);
+  const item = {day, title: `${p.name} goes to jail`, text: `${p.name} went ${Math.round(cfg('jailDays'))} days without a home and was taken to the Town Jail${stay > 1 ? `. That’s jail stay number ${stay}` : ''}.`};
+  if (patch) patch.news = [item, ...(patch.news || S.settings.news || [])].slice(0, 12);
+}
+async function releaseFromJail(pid, how) {
+  const p = S.players[pid], stay = Number(p?.jailCount || 1), c = consequenceFor(stay), cur = restr(pid);
+  const r = {...cur, ...c.r, lotteryBan: !!(cur.lotteryBan || c.r.lotteryBan)};
+  await db.doc('players/' + pid).update({jail: null, homelessSince: p?.home ? null : today(), restrict: r});
+  // Inspections and audits were paused in jail; give them fresh deadlines now.
+  if (auditPending(pid)) await db.doc('players/' + pid).update({audit: {...auditOf(pid), dueDay: today() + Math.max(0, Math.round(cfg('auditDays')))}});
+  for (const sh of Object.values(S.shops).filter(x => x.ownerId === pid && quizPending(x))) await db.doc('shops/' + sh.id).update({quiz: {...sh.quiz, dueDay: today() + Math.max(0, Math.round(cfg('inspectDays')))}});
+  await sendMsg('bank', pid, `You’re out of jail (${how}). Your record now: ${c.text} ${p?.home ? '' : `Find a home by the end of Day ${today() + Math.max(1, Math.round(cfg('jailDays'))) - 1} or you’ll be back!`}`);
+  await db.doc('town/settings').update({news: [{day: today(), title: `${p?.name || 'A resident'} gets out of jail`, text: `${p?.name || 'A resident'} left the Town Jail (${how}).`}, ...(S.settings.news || [])].slice(0, 12)});
+}
+async function doJail(day, patch) {
+  if (S.settings.jailStart == null) {
+    for (const p of playerList().filter(p => !p.home)) await db.doc('players/' + p.id).update({homelessSince: day});
+    await db.doc('town/settings').update({jailStart: day}); return '';
+  }
+  let n = 0;
+  for (const p of playerList().filter(p => !p.home && !p.jail)) {
+    if (p.homelessSince == null) { await db.doc('players/' + p.id).update({homelessSince: day}); continue; }
+    if (day > jailDeadline(p)) { await sendToJail(p, day, patch); n++; }
+  }
+  return n ? `${n} resident${n > 1 ? 's' : ''} sent to jail` : '';
+}
+function jailView() {
+  const pid = S.me, j = S.players[pid].jail, b = balances(), have = bal(b, pid, 'c') + Math.max(0, bal(b, pid, 's')), bail = j.bail ?? cfg('bailAmount'), left = Math.max(0, j.needed - j.solved);
+  return `<section class="panel" style="border:2px solid var(--bad)"><p class="eyebrow">Town Jail · since Day ${j.since}</p><h2>You’re in jail</h2>
+      <p>You went ${Math.round(cfg('jailDays'))} days without a home. While you’re here you get <b>no paychecks</b>, your <b>businesses are closed</b>, and your <b>bills keep coming</b>. Inspections and tax audits are paused until you’re out.</p>
+      <p class="neg"><b>${j.stay > 1 ? `This is jail stay #${j.stay}. ` : ''}When you get out:</b> ${consequenceFor(j.stay || jailStays(pid) || 1).text} Every jail stay also costs 40 credit points.</p></section>
+    <div class="cols even"><div class="stack">
+      <section class="panel"><h3>Way out 1: Pay bail</h3><p>Bail is <b class="num">${money(bail)}</b>. It comes out of checking first, then savings. You have <b class="num">${money(have)}</b>.</p>
+        <div><button class="btn gold" data-act="payBail" ${have >= bail ? '' : 'disabled'}>Pay ${money(bail)} bail</button></div>
+        ${have < bail ? '<p class="muted" style="font-size:.88rem">Not enough money. Try work release.</p>' : ''}</section>
+    </div><div class="stack">
+      <section class="panel"><div class="panel-head"><h3>Way out 2: Work release</h3><span class="pill warn">${j.solved} of ${j.needed} done</span></div>
+        <div style="height:10px;border-radius:6px;background:var(--paper);overflow:hidden"><div style="height:100%;width:${Math.round(j.solved / j.needed * 100)}%;background:var(--good)"></div></div>
+        <p class="muted" style="font-size:.88rem">${left} problem${left === 1 ? '' : 's'} to go. Every wrong answer adds one more problem.${j.wrong ? ` Wrong so far: ${j.wrong}.` : ''}</p>
+        <p class="problem">${esc(j.q)}</p>
+        <form class="inline" data-form="jailAnswer"><label>Your answer<input id="jl-ans" inputmode="decimal" required autocomplete="off"></label><button class="btn">Submit</button></form></section>
+    </div></div>`;
+}
 const owesOf = pid => loansOf(pid).filter(l => l.status === 'active').reduce((a, l) => a + l.balance, 0) + openBills(pid).reduce((a, b) => a + b.total, 0) + Math.max(0, -bal(balances(), pid, 'c'));
 const bizValue = sh => sh.startCost ?? bizCost(bizType(sh));
 const acctOf = pid => pid === 'bank' ? 'bank' : pid + '.c';
@@ -666,6 +761,7 @@ async function doNeeds(day) {
   const dd = day - 1; if (dd < S.settings.needsSince) return '';
   let full = 0, missedAll = 0;
   for (const p of playerList()) {
+    if (p.jail) continue;
     const needs = needsFor(p.id, dd); if (!needs.length) continue;
     const met = needs.filter(k => needMet(p.id, dd, k)), missed = needs.filter(k => !met.includes(k));
     if (!missed.length && cfg('needsBonus') > 0) { await addTx('bank', p.id + '.c', cfg('needsBonus'), 'needs', `Bonus: met all your needs on Day ${dd}`, {day}); full++; }
@@ -713,12 +809,12 @@ function credit(pid) {
   const onTime = bs.filter(b => b.status === 'paid').length;
   const late = bs.filter(b => b.status === 'late' || b.status === 'paidLate').length;
   const base = Math.max(5000, (p.wage || 0) * 3);
-  let score = 620 + paid * 40 + Math.min(100, pays * 6) + Math.min(60, onTime * 5) - missed * 60 - late * 30 - foreclosed * 100 - Math.round(Math.min(1, owed / base) * 80);
+  let score = 620 + paid * 40 + Math.min(100, pays * 6) + Math.min(60, onTime * 5) - missed * 60 - late * 30 - foreclosed * 100 - Number(p.jailCount || 0) * 40 - Math.round(Math.min(1, owed / base) * 80);
   score = Math.max(300, Math.min(850, score));
   const band = score >= 750 ? ['Excellent', 'good'] : score >= 670 ? ['Good', 'note'] : score >= 580 ? ['Fair', 'warn'] : ['Needs work', 'bad'];
   const mult = score >= 750 ? 2 : score >= 670 ? 1.5 : score >= 580 ? 1 : .5;
   const limit = Math.round(base * mult);
-  return {score, band, limit, owed, avail: Math.max(0, limit - owed), paid, pays, missed, onTime, late, foreclosed};
+  return {score, band, limit, owed, avail: Math.max(0, limit - owed), paid, pays, missed, onTime, late, foreclosed, jailed: Number(p.jailCount || 0)};
 }
 function gauge(score, cls) {
   const f = (score - 300) / 550, a = Math.PI * (1 - f), r = 48;
@@ -760,7 +856,7 @@ async function addBill(playerId, kind, label, items, day, extra = {}) {
   const total = items.reduce((s, u) => s + u.amount, 0); if (total <= 0) return;
   await db.collection('bills').add({playerId, kind, label, items, total, issuedDay: day, dueDay: day + Math.max(0, Math.round(cfg('billGrace'))), status: 'due', at: Date.now(), ...extra});
 }
-function toast(msg, err) { S.toast = {msg, err}; clearTimeout(toast.t); toast.t = setTimeout(() => { S.toast = null; render(); }, 3600); render(); }
+function toast(msg, err) { S.toast = {msg, err}; clearTimeout(toast.t); toast.t = setTimeout(() => { S.toast = null; schedule(); }, 3600); schedule(); }
 async function run(fn) {
   if (S.busy) return;
   S.busy = true;
@@ -777,7 +873,7 @@ const clear = (...ids) => ids.forEach(i => clearIds.add(i));
 
 // Scheduled town events. Each returns a short summary or '' and may add to the settings patch.
 async function doPayday(patch) {
-  const ps = playerList().filter(p => (p.wage || 0) > 0); if (!ps.length) return '';
+  const ps = playerList().filter(p => (p.wage || 0) > 0 && !p.jail); if (!ps.length) return '';
   const tr = cfg('taxRate'), bonus = Number(S.settings.payBonus || 0);
   for (const p of ps) {
     const gross = Math.round(p.wage * (100 + bonus) / 100), tax = Math.round(gross * tr / 100);
@@ -886,6 +982,7 @@ async function doLicenses(day) {
 async function advanceDay() {
   const d = today() + 1, patch = {}, done = [];
   { const r = await doNeeds(d); if (r) done.push(r); }
+  { const r = await doJail(d, patch); if (r) done.push(r); }
   const late = await markLate(d); if (late) done.push(late);
   const cd = await doCds(d); if (cd) done.push(cd);
   { const r = await doLicenses(d); if (r) done.push(r); }
@@ -1089,7 +1186,7 @@ async function applyInspection(sh, grade, day, {surprise = false, kindName = 'In
 }
 async function doInspections(day) {
   let n = 0;
-  for (const sh of Object.values(S.shops).filter(x => x.ownerId !== 'bank')) {
+  for (const sh of Object.values(S.shops).filter(x => x.ownerId !== 'bank' && !inJail(x.ownerId))) {
     if (quizPending(sh) && sh.quiz.dueDay < day) { await finishInspection(sh, sh.quiz, day); continue; }
     if (!quizPending(sh) && sh.inspection?.nextDue != null && sh.inspection.nextDue <= day) { await startInspection(sh.id, day, false); n++; }
   }
@@ -1110,6 +1207,34 @@ function inspectionView() {
   }).join('');
 }
 
+// The hotel was retired: refund open bookings, buy back hotel shares, and remove it.
+async function closeHotels() {
+  if (S.closingHotels || !(S.hotelsRaw || []).length) return;
+  S.closingHotels = true;
+  try {
+    for (const h of S.hotelsRaw) {
+      for (const hd of S.holdings.filter(x => x.shopId === h.id && x.shares > 0)) {
+        const pay = hd.shares * sharePrice(h.id);
+        await addTx('bank', hd.playerId + '.c', pay, 'stock', `The town bought back ${hd.shares} share${hd.shares > 1 ? 's' : ''} of ${h.name} when it closed`);
+        await db.doc('holdings/' + hd.id).set({playerId: hd.playerId, shopId: h.id, shares: 0, cost: 0});
+        await sendMsg('bank', hd.playerId, `${h.name} has closed. The town bought back your ${hd.shares} share${hd.shares > 1 ? 's' : ''} for ${money(pay)}.`);
+      }
+      for (const o of S.orders.filter(o => o.shopId === h.id && o.status === 'new')) {
+        await addTx(acctOf(h.ownerId), o.buyerId + '.c', o.total, 'refund', `Refund: ${h.name} closed`);
+        await db.doc('orders/' + o.id).update({status: 'refunded'});
+      }
+      if (h.ownerId && h.ownerId !== 'bank') {
+        const back = h.startCost ?? bizCost('hotel');
+        if (back > 0) await addTx('bank', h.ownerId + '.c', back, 'biz', `The town closed ${h.name} and refunded its opening cost`);
+        await sendMsg('bank', h.ownerId, `The town closed all hotels, including ${h.name}. You got ${money(back)} back.`);
+      }
+      for (const it of Object.values(S.items).filter(i => i.shopId === h.id)) await db.doc('items/' + it.id).delete();
+      await db.doc('shops/' + h.id).delete();
+      await db.doc('town/settings').update({news: [{day: today(), title: `${h.name} closes`, text: `${h.name} has closed its doors. Open bookings were refunded and shareholders were bought out.`}, ...(S.settings.news || [])].slice(0, 12)});
+    }
+    toast('The hotel is closed and cleaned up');
+  } finally { S.closingHotels = false; }
+}
 async function markLate(day) {
   const fee = Math.max(0, Math.round(cfg('lateFee'))); let n = 0;
   for (const b of S.bills.filter(b => b.status === 'due' && b.dueDay < day)) { await db.doc('bills/' + b.id).update({status: 'late', lateFee: fee, total: b.total + fee}); n++; }
@@ -1133,16 +1258,34 @@ async function drawEvent(day, patch) {
 }
 
 // ---------- render ----------
-let raf = 0;
-function schedule() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; render(); }); }
+let raf = 0, held = false, deferSince = 0;
+// Updates from other devices wait while this person is mid-tap or has a dropdown open, so nothing moves under their finger.
+const uiBusy = () => { const a = document.activeElement; return held || (a && app.contains(a) && a.tagName === 'SELECT'); };
+function schedule() {
+  if (raf) return;
+  raf = requestAnimationFrame(() => {
+    raf = 0;
+    if (uiBusy() && Date.now() - (deferSince || (deferSince = Date.now())) < 8000) { setTimeout(schedule, 350); return; }
+    deferSince = 0; render();
+  });
+}
+document.addEventListener('pointerdown', () => { held = true; }, true);
+document.addEventListener('pointerup', () => { setTimeout(() => { held = false; }, 120); }, true);
+document.addEventListener('pointercancel', () => { held = false; }, true);
 function render() {
   const saved = {}; const ae = document.activeElement;
   app.querySelectorAll('input[id],select[id],textarea[id]').forEach(el => saved[el.id] = el.type === 'checkbox' ? el.checked : el.value);
   const focusId = ae && ae.id && app.contains(ae) ? ae.id : null;
   let sel = null; try { sel = focusId ? [ae.selectionStart, ae.selectionEnd] : null; } catch (e) {}
   if (S.tab === 'messages' && S.thread && S.me) markRead(S.thread);
+  const tabsX = app.querySelector('.tabs')?.scrollLeft || 0, pageY = window.scrollY;
+  const th0 = document.getElementById('thread'), thBottom = !th0 || th0.scrollHeight - th0.scrollTop - th0.clientHeight < 40, thTop = th0 ? th0.scrollTop : 0;
+  app.classList.toggle('anim', !!S.anim);
+  if (S.anim) { S.anim = false; clearTimeout(render.animT); render.animT = setTimeout(() => app.classList.remove('anim'), 450); }
   app.innerHTML = view();
-  const th = document.getElementById('thread'); if (th) th.scrollTop = th.scrollHeight;
+  const tabs2 = app.querySelector('.tabs'); if (tabs2) tabs2.scrollLeft = tabsX;
+  if (Math.abs(window.scrollY - pageY) > 1) window.scrollTo(0, pageY);
+  const th = document.getElementById('thread'); if (th) th.scrollTop = thBottom ? th.scrollHeight : thTop;
   for (const [id, v] of Object.entries(saved)) {
     if (clearIds.has(id)) continue;
     const el = document.getElementById(id); if (el && el.type === 'checkbox') el.checked = !!v; else if (el && el.type !== 'hidden') el.value = v;
@@ -1202,8 +1345,8 @@ function shell(isBank) {
   const bankQueue = waitingTeller().length + Object.values(S.loans).filter(l => l.status === 'requested').length;
   const myWaiting = tellerOf(S.me).filter(t => t.status === 'waiting').length + loansOf(S.me).filter(l => l.status === 'requested').length;
   const tabs = isBank
-    ? [['town','Town'],['paper','Gazette'],['calendar','Day & schedule'],['teller','Teller window', bankQueue],['jobs','Odd jobs', S.gigs.filter(g => g.status === 'review' && g.kind !== 'request').length],['hotel','Bank businesses', S.orders.filter(o => o.sellerId === 'bank' && o.status === 'new').length],['inspector','Inspector', Object.values(S.shops).filter(sh => sh.ownerId !== 'bank').filter(sh => sh.renewalRequested || inspOverdue(sh) || sh.inspection?.nextDue === today()).length],['messages','Messages', unreadTotal()],['people','Residents'],['shops','Businesses'],['settings','Settings']]
-    : [['home','Accounts'],['paper','Gazette'],['messages','Messages', unreadTotal()],['bills','Bills', openBills(S.me).length],['jobs','Odd jobs', activeGigs(S.me).filter(g => g.status === 'claimed').length + S.gigs.filter(g => g.kind === 'request' && g.postedBy === S.me && g.status === 'review').length],['housing','Housing'],['pay','Write a check'],['shop','Main Street'],...(Object.values(S.shops).some(sh => sh.ownerId === S.me && sh.quiz && (quizPending(sh) || sh.quiz.doneDay === today())) ? [['inspect','Inspection', Object.values(S.shops).filter(sh => sh.ownerId === S.me && quizPending(sh)).length]] : []),
+    ? [['town','Town'],['paper','Gazette'],['calendar','Day & schedule'],['teller','Teller window', bankQueue],['jobs','Odd jobs', S.gigs.filter(g => g.status === 'review' && g.kind !== 'request').length],...(Object.values(S.shops).some(x => x.ownerId === 'bank') ? [['hotel','Bank businesses', S.orders.filter(o => o.sellerId === 'bank' && o.status === 'new').length]] : []),['inspector','Inspector', Object.values(S.shops).filter(sh => sh.ownerId !== 'bank').filter(sh => sh.renewalRequested || inspOverdue(sh) || sh.inspection?.nextDue === today()).length],['messages','Messages', unreadTotal()],['people','Residents'],['shops','Businesses'],['settings','Settings']]
+    : inJail(S.me) ? [['jail','Town jail']] : [['home','Accounts'],['paper','Gazette'],['messages','Messages', unreadTotal()],['bills','Bills', openBills(S.me).length],['jobs','Odd jobs', activeGigs(S.me).filter(g => g.status === 'claimed').length + S.gigs.filter(g => g.kind === 'request' && g.postedBy === S.me && g.status === 'review').length],['housing','Housing'],['pay','Write a check'],['shop','Main Street'],...(Object.values(S.shops).some(sh => sh.ownerId === S.me && sh.quiz && (quizPending(sh) || sh.quiz.doneDay === today())) ? [['inspect','Inspection', Object.values(S.shops).filter(sh => sh.ownerId === S.me && quizPending(sh)).length]] : []),
       ...(auditPending(S.me) ? [['audit','Tax audit', 1]] : auditOf(S.me)?.doneDay === today() ? [['audit','Tax audit']] : []),['myshop','My businesses', (bizCount(S.me) > bizLimit() ? 1 : 0) + Object.values(S.shops).filter(sh => sh.ownerId === S.me).reduce((a, sh) => a + lowStock(sh).filter(i => i.stock === 0).length, 0) + myOrders + Object.values(S.shops).filter(sh => sh.ownerId === S.me && ['Today', 'Overdue'].includes(inspNotice(sh)?.short)).length],['stocks','Stocks'],['lottery','Lottery', ((() => { const l = (S.settings.lotteryHistory || [])[0]; return l && l.numbers && l.drawNo > Number(ls('ptb.lotto.seen.' + S.me) || 0) && S.lottoTickets.some(t => t.drawNo === l.drawNo && t.playerId === S.me) ? 1 : 0; })()) + S.lottoTickets.filter(t => t.kind === 'scratch' && t.playerId === S.me && !t.done).length],['bank','Bank & credit', myWaiting]];
   if (!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
   const who = isBank ? 'Banker mode' : nameOf(S.me) + (S.players[S.me]?.job ? ' · ' + S.players[S.me].job : '');
@@ -1228,6 +1371,7 @@ function billCard(b, canPay) {
 }
 
 function playerView() {
+  if (inJail(S.me)) return jailView();
   if (S.tab === 'messages') return messagesView();
   if (S.tab === 'paper') return paperView();
   if (S.tab === 'audit') return auditView();
@@ -1247,7 +1391,8 @@ function playerView() {
     ${auditPending(pid) ? `<div class="alert bad"><span><b>Surprise tax audit!</b> Answer ${AUDIT_N} problems by the end of ${auditOf(pid).dueDay === today() ? 'today' : 'Day ' + auditOf(pid).dueDay}.</span><button class="btn sm" data-act="tab" data-id="audit">Start audit</button></div>` : ''}
     ${Object.values(S.shops).filter(sh => sh.ownerId === pid && ['Today', 'Tomorrow', 'Overdue'].includes(inspNotice(sh)?.short)).map(sh => { const n = inspNotice(sh); return `<div class="alert ${n.cls === 'bad' ? 'bad' : ''}"><span><b>${esc(sh.name)}:</b> ${esc(n.text)}</span><button class="btn sm" data-act="tab" data-id="myshop">Open</button></div>`; }).join('')}
     ${bizCount(pid) > bizLimit() ? `<div class="alert bad"><span><b>Too many businesses.</b> The limit is ${bizLimit()}. Choose which to close.</span><button class="btn sm" data-act="tab" data-id="myshop">Choose</button></div>` : ''}
-    ${!p.home ? `<div class="alert"><span><b>You don’t have a place to live yet.</b> Rent or buy a home when you’re ready.</span><button class="btn sm" data-act="tab" data-id="housing">Find a home</button></div>` : ''}
+    ${restrictText(pid).length ? `<div class="alert"><span><b>Jail record (${jailStays(pid)} stay${jailStays(pid) === 1 ? '' : 's'}):</b> ${restrictText(pid).join(', ')}.</span></div>` : ''}
+    ${!p.home ? `<div class="alert bad"><span><b>No home!</b> Find one by the end of ${jailDeadline(p) <= today() ? 'today' : 'Day ' + jailDeadline(p)} or you’ll go to the Town Jail.</span><button class="btn sm" data-act="tab" data-id="housing">Find a home</button></div>` : ''}
     ${(() => { const needs = needsFor(pid, today()); if (!needs.length) return ''; const met = needs.filter(k => needMet(pid, today(), k)).length;
       return `<section class="panel"><div class="panel-head"><h3>Today’s needs</h3><span class="pill ${met === needs.length ? 'good' : 'warn'}">${met} of ${needs.length}</span></div>
         <div class="list">${needs.map(k => { const ok = needMet(pid, today(), k); return `<div class="li"><span class="badge" style="${ok ? 'color:var(--good)' : ''}">${ok ? '✓' : '○'}</span><div class="main"><b>${NEED_CATS[k].label}</b><small>Buy from ${NEED_CATS[k].where} run by someone else</small></div></div>`; }).join('')}</div>
@@ -1359,8 +1504,8 @@ function playerView() {
           ${T.hotel && isOpenBiz(s) && items.length ? `<div><p class="eyebrow" style="margin-bottom:6px">Pick a night</p><div class="row" style="gap:6px">${[0, 1, 2, 3, 4, 5, 6].map(k => { const d = today() + k; return `<button class="btn ${hotelDay(s.id) === d ? '' : 'ghost'} sm" data-act="pickNight" data-id="${s.id}:${d}">${k === 0 ? 'Tonight' : k === 1 ? 'Tomorrow' : 'Day ' + d}</button>`; }).join('')}</div></div>` : ''}
           <div class="list">${items.length ? items.map(i => {
             const free = T.hotel ? roomsFree(s, i, hotelDay(s.id)) : null;
-            const make = canMake(s, i), out = T.hotel ? free <= 0 : (i.stock != null && i.stock <= 0) || make <= 0;
-            return `<div class="li"><div class="main"><b>${esc(i.name)}</b><small>${T.hotel ? (out ? 'Fully booked' : `${free} of ${i.stock || 0} rooms free`) + ' · ' + (hotelDay(s.id) === today() ? 'tonight' : 'Day ' + hotelDay(s.id)) + ' · per night' : make <= 0 ? 'Out of ingredients' : i.recipe?.length ? `Made with ${esc(i.recipe.map(r => r.name.toLowerCase()).join(', '))}${make < 10 ? ' · ' + make + ' left' : ''}` : i.stock == null ? T.always : out ? 'Sold out' : i.stock + ' left'}</small></div>
+            const make = canMake(s, i), out = T.hotel ? free <= 0 : T.daily ? slotsLeft(i) <= 0 || make <= 0 : (i.stock != null && i.stock <= 0) || make <= 0;
+            return `<div class="li"><div class="main"><b>${esc(i.name)}</b><small>${T.hotel ? (out ? 'Fully booked' : `${free} of ${i.stock || 0} rooms free`) + ' · ' + (hotelDay(s.id) === today() ? 'tonight' : 'Day ' + hotelDay(s.id)) + ' · per night' : T.daily && slotsLeft(i) <= 0 ? outToday(T) : make <= 0 ? 'Out of ingredients' : i.recipe?.length ? `Made with ${esc(i.recipe.map(r => r.name.toLowerCase()).join(', '))} · ${Math.min(make, slotsLeft(i))} left today` : T.daily ? (slotsLeft(i) > 0 ? `${slotsLeft(i)} of ${slotsCap(i)} left today` : 'Fully booked today. Come back tomorrow!') : i.stock == null ? T.always : out ? 'Sold out' : i.stock + ' left'}</small></div>
               <span class="amt">${pct ? `<s class="muted">${money(i.price)}</s> <b class="neg">${money(priceNow(i, s))}</b>` : money(i.price)}</span>
               ${out || !isOpenBiz(s) ? '' : `<input id="q-${i.id}" type="number" min="1" value="1" style="width:70px;min-height:40px;padding:6px 8px" aria-label="Quantity"><button class="btn sm" data-act="buy" data-id="${i.id}">${T.buy}</button>`}</div>`;
           }).join('') : `<div class="empty">Nothing on the ${T.list.toLowerCase()} yet.</div>`}</div></section>`;
@@ -1441,7 +1586,7 @@ function playerView() {
           <div class="stat"><b>${cr.onTime}</b><span>Bills paid on time (+5 each)</span></div>
           <div class="stat"><b>${cr.late}</b><span>Late bills (−30 each)</span></div>
           <div class="stat"><b>${cr.missed}</b><span>Missed loan payments (−60 each)</span></div>
-          ${cr.foreclosed ? `<div class="stat"><b class="neg">${cr.foreclosed}</b><span>Businesses foreclosed (−100 each)</span></div>` : ''}
+          ${cr.foreclosed ? `<div class="stat"><b class="neg">${cr.foreclosed}</b><span>Businesses foreclosed (−100 each)</span></div>` : ''}${cr.jailed ? `<div class="stat"><b class="neg">${cr.jailed}</b><span>Jail stays (−40 each)</span></div>` : ''}
           <div class="stat"><b>${money(cr.owed)}</b><span>Owed of ${money(cr.limit)} limit</span></div></div>
         <p class="muted" style="font-size:.88rem">Scores run 300 to 850. You need at least 580 for a mortgage. Paying bills and loans on time raises it. Late bills, missed payments, or borrowing close to your limit lower it.</p></section>
     </div></div>`;
@@ -1511,10 +1656,11 @@ function lotteryView() {
   const lastBlock = !last ? '' : unseen
     ? `<section class="panel lotto" style="text-align:center"><p class="eyebrow">Drawing #${last.drawNo} · Day ${last.day}</p><h2>The drawing is in!</h2><div class="balls" style="justify-content:center">${[0, 1, 2].map(() => '<span class="ball hidden">?</span>').join('')}</div><div><button class="btn" style="background:#1b1205;color:#fff" data-act="lottoReveal">Reveal the numbers</button></div></section>`
     : `<section class="panel"><div class="panel-head"><h3>Last drawing · #${last.drawNo}</h3><span class="muted" style="font-size:.85rem">Day ${last.day} · ${last.tickets} tickets</span></div>
-        <div class="balls">${drawn.map((n, i) => i < revealing ? `<span class="ball pop">${n}</span>` : '<span class="ball hidden">?</span>').join('')}</div>
+        <div class="balls">${drawn.map((n, i) => i < revealing ? `<span class="ball ${S.reveal && S.reveal.drawNo === last.drawNo && i === S.reveal.shown - 1 ? 'pop' : ''}">${n}</span>` : '<span class="ball hidden">?</span>').join('')}</div>
         ${revealing >= 3 ? `<p>${jw.length ? `<b>Jackpot won by ${esc([...new Set(jw.map(nameOf))].join(' & '))}: ${money(last.prize)}!</b>` : 'No jackpot winner. It rolled over and grew.'}</p>
         ${myLast.length ? `<div class="list">${myLast.map(t => { const m = matchCount(t.numbers, drawn), pz = prizeFor(m); return `<div class="li"><div class="balls">${t.numbers.map(n => `<span class="ball sm ${drawn.includes(n) ? 'hit' : 'miss'}">${n}</span>`).join('')}</div><div class="main"><b>${m === 3 ? 'JACKPOT!' : m ? 'Matched ' + m : 'No match'}</b></div><span class="amt ${pz ? 'pos' : 'muted'}">${pz ? money(pz, true) : '—'}</span></div>`; }).join('')}</div>` : '<p class="muted">You didn’t have a ticket in that drawing.</p>'}` : ''}</section>`;
   return `<div class="cols"><div class="stack">
+    ${noLottery(pid) ? `<div class="alert bad"><span><b>No lottery for you right now.</b> ${restr(pid).lotteryBan ? 'Your jail record got you banned until the banker clears it.' : `Your jail record blocks tickets and scratch-offs through Day ${restr(pid).lotteryUntil}.`}</span></div>` : ''}
     <section class="panel lotto"><p class="eyebrow">${esc(S.settings.name)} Pick 3 Lottery · Drawing #${L.drawNo}</p><div class="bigday num">${money(lottoPot())}</div>
       <p>Jackpot · drawing ${dayIn(nextOn('lotteryEvery'))} · ${all.length} ticket${all.length === 1 ? '' : 's'} sold · grows ${money(cfg('pick3Boost'))} extra if nobody wins</p></section>
     ${lastBlock}
@@ -1741,21 +1887,22 @@ function manageBiz(shop) {
         return `<section class="panel"><h3>Pantry</h3><p class="muted" style="font-size:.85rem">Ingredients your ${T.list.toLowerCase()} needs. Buy them from other businesses.</p>
         ${keys.map(k => { const have = pantryOf(shop)[k] || 0, sellers = sellersOf(k, shop.ownerId);
           return `<div style="border-top:1px solid var(--line);padding:10px 0;display:grid;gap:8px"><div class="panel-head"><b>${esc(need[k])}</b><span class="pill ${have > 0 ? 'note' : 'bad'}">${have} on hand</span></div>
-            ${sellers.length ? `<form class="inline" data-form="buyIng" data-id="${sid}|${k}"><label style="flex:1 1 220px">From<select id="bi-s-${sid}-${k}">${sellers.map(x => `<option value="${x.item.id}">${esc(x.shop.name)} · ${money(x.item.price)} each${x.item.stock != null ? ' · ' + x.item.stock + ' left' : ''}</option>`).join('')}</select></label><label style="flex:0 1 90px">How many<input id="bi-q-${sid}-${k}" type="number" min="1" value="5"></label><button class="btn gold sm">Buy</button></form>`
+            ${sellers.length ? `<form class="inline" data-form="buyIng" data-id="${sid}|${k}"><label style="flex:1 1 220px">From<select id="bi-s-${sid}-${k}">${sellers.map(x => `<option value="${x.item.id}">${esc(x.shop.name)} · ${money(x.item.price)} each${isDaily(x.shop) ? ' · ' + slotsLeft(x.item) + ' left today' : x.item.stock != null ? ' · ' + x.item.stock + ' left' : ''}</option>`).join('')}</select></label><label style="flex:0 1 90px">How many<input id="bi-q-${sid}-${k}" type="number" min="1" value="5"></label><button class="btn gold sm">Buy</button></form>`
               : `<p class="muted" style="font-size:.88rem">Nobody sells ${esc(need[k].toLowerCase())} yet. Ask a farm stand or shop to start selling it!</p>`}</div>`; }).join('')}</section>`; })()}
       <section class="panel"><h3>Add to the ${T.list.toLowerCase()}</h3><form data-form="addItem" data-id="${sid}"><div class="fields">
         <label>${T.item}<input id="ai-n-${sid}" required maxlength="40" placeholder="${T.iph}"></label>
         <label>Price${T.hotel ? ' per night' : ''}<input id="ai-p-${sid}" inputmode="decimal" required placeholder="${T.hotel ? '8.00' : '2.00'}"></label>
-        <label>${T.restock ? 'Starting stock to buy' : T.stockLbl}<input id="ai-s-${sid}" type="number" min="${T.hotel ? 1 : 0}" placeholder="${T.hotel ? 'How many rooms' : T.restock ? 'How many' : 'Blank = unlimited'}" ${T.hotel || T.restock ? 'required' : ''}></label></div>
+        <label>${T.restock ? 'Starting stock to buy' : T.stockLbl}<input id="ai-s-${sid}" type="number" min="${T.hotel || T.daily ? 1 : 0}" placeholder="${T.hotel ? 'How many rooms' : T.daily ? 'How many a day' : T.restock ? 'How many' : 'Blank = unlimited'}" ${T.hotel || T.restock || T.daily ? 'required' : ''}></label></div>
         ${T.restock ? `<p class="muted" style="font-size:.85rem">Stock costs ${cfg('wholesalePct')}% of your selling price from the town wholesaler (at least ${money(25)} each). It comes out of your checking.</p>` : ''}
-        ${T.hotel ? '' : `<label>Needs ingredients? (optional)<input id="ai-r-${sid}" maxlength="120" placeholder="Carrots x2, Celery x1"></label><p class="muted" style="font-size:.85rem">List what goes into it. You’ll buy those from other businesses for your pantry, and each sale uses them up.</p>`}
+        ${T.hotel ? '' : `<div style="display:grid;gap:6px"><p class="eyebrow">Ingredients (optional)</p>${recipeBuilder('new-' + sid, shop.ownerId, [])}<p class="muted" style="font-size:.85rem">Pick what goes into each one. You’ll buy them from other businesses for your pantry, and each sale uses them up.</p></div>`}
         <div><button class="btn">Add</button></div></form></section>
       <section class="panel"><h3>${T.list}</h3><div class="list">${items.length ? items.map(i => `<div style="border-top:1px solid var(--line);padding:10px 0;display:grid;gap:8px"><form class="inline" data-form="editItem" data-id="${i.id}" style="flex-wrap:nowrap;align-items:center">
-        <div class="main" style="flex:1;min-width:0"><b>${esc(i.name)}</b>${T.restock ? `<small class="${i.stock === 0 ? 'neg' : i.stock != null && i.stock <= 2 ? 'neg' : 'muted'}" style="display:block">${i.stock == null ? 'Starter stock arrives next day' : i.stock === 0 ? 'SOLD OUT' : i.stock + ' in stock'}</small>` : ''}${pct ? `<small class="neg" style="display:block">On sale: ${money(priceNow(i, shop))}</small>` : ''}</div>
+        <div class="main" style="flex:1;min-width:0"><b>${esc(i.name)}</b>${T.daily ? `<small class="${slotsLeft(i) ? 'muted' : 'neg'}" style="display:block">${slotsUsed(i.id, today())} of ${slotsCap(i)} ${T.cogs ? 'sold' : 'booked'} today · ${T.stockLbl.toLowerCase()} →</small>` : ''}${T.restock ? `<small class="${i.stock === 0 ? 'neg' : i.stock != null && i.stock <= 2 ? 'neg' : 'muted'}" style="display:block">${i.stock == null ? 'Starter stock arrives next day' : i.stock === 0 ? 'SOLD OUT' : i.stock + ' in stock'}</small>` : ''}${pct ? `<small class="neg" style="display:block">On sale: ${money(priceNow(i, shop))}</small>` : ''}</div>
         <input id="ei-p-${i.id}" inputmode="decimal" value="${(i.price / 100).toFixed(2)}" style="width:86px;min-height:40px;padding:6px 8px" aria-label="Price">
-        ${T.restock ? '' : `<input id="ei-s-${i.id}" type="number" min="0" value="${i.stock ?? ''}" placeholder="∞" style="width:70px;min-height:40px;padding:6px 8px" aria-label="${T.stockLbl}">`}
+        ${T.restock ? '' : T.daily ? `<input id="ei-s-${i.id}" type="number" min="1" value="${slotsCap(i)}" style="width:70px;min-height:40px;padding:6px 8px" aria-label="${T.stockLbl}" title="${T.stockLbl}">` : `<input id="ei-s-${i.id}" type="number" min="0" value="${i.stock ?? ''}" placeholder="∞" style="width:70px;min-height:40px;padding:6px 8px" aria-label="${T.stockLbl}">`}
         <button class="btn ghost sm">Save</button><button type="button" class="btn danger sm" data-act="removeItem" data-id="${i.id}" aria-label="Remove">✕</button></form>
-        ${T.hotel ? '' : `<form class="inline" data-form="editRecipe" data-id="${i.id}" style="align-items:center"><label style="flex:1 1 200px">Ingredients<input id="er-${i.id}" maxlength="120" value="${esc(recipeText(i.recipe))}" placeholder="None"></label><button class="btn ghost sm">Save</button>${i.recipe?.length ? `<span class="pill ${canMake(shop, i) > 0 ? 'note' : 'bad'}">${canMake(shop, i) > 0 ? 'Can make ' + canMake(shop, i) : 'Out of ingredients'}</span>` : ''}</form>`}
+        ${T.hotel ? '' : S.editRecipe === i.id ? `<form data-form="editRecipe" data-id="${i.id}" style="display:grid;gap:6px;background:var(--paper);border-radius:10px;padding:10px"><p class="eyebrow">Ingredients for ${esc(i.name)}</p>${recipeBuilder('it-' + i.id, shop.ownerId, i.recipe || [])}<div class="row"><button class="btn sm">Save ingredients</button><button type="button" class="btn ghost sm" data-act="recEdit" data-id="">Cancel</button></div></form>`
+          : `<div class="row" style="justify-content:space-between;align-items:center"><small class="muted">${i.recipe?.length ? 'Ingredients: ' + esc(i.recipe.map(r => `${r.name} ×${r.qty}`).join(', ')) : 'No ingredients'}</small><span class="row" style="gap:6px">${i.recipe?.length ? `<span class="pill ${canMake(shop, i) > 0 ? 'note' : 'bad'}">${canMake(shop, i) > 0 ? 'Can make ' + canMake(shop, i) : 'Out of ingredients'}</span>` : ''}<button type="button" class="btn ghost sm" data-act="recEdit" data-id="${i.id}">${i.recipe?.length ? 'Edit' : 'Add ingredients'}</button></span></div>`}
         ${T.restock && i.stock != null ? (() => { const farms = t === 'restaurant' ? Object.values(S.shops).filter(f => bizType(f) === 'farm' && f.ownerId !== shop.ownerId && isOpenBiz(f)) : []; const fc = Math.round(unitCost(i) * (100 - cfg('farmDiscount')) / 100);
           return `<form class="inline" data-form="restock" data-id="${i.id}" style="align-items:center"><label style="flex:0 1 auto">Restock<input id="rs-${i.id}" type="number" min="1" value="5" style="width:80px"></label>
           ${farms.length ? `<label style="flex:1 1 200px">From<select id="rs-src-${i.id}">${farms.map(f => `<option value="${f.id}">${esc(f.name)} · ${money(fc)} each (local farm)</option>`).join('')}<option value="w">Town wholesaler · ${money(unitCost(i))} each</option></select></label>` : `<span class="muted" style="font-size:.85rem">${money(unitCost(i))} each from the wholesaler</span>`}<button class="btn gold sm">Buy stock</button></form>`; })() : ''}</div>`).join('') : `<div class="empty">Add your first ${T.item.toLowerCase()}.</div>`}</div></section>
@@ -1769,9 +1916,10 @@ function bankView() {
   if (S.tab === 'jobs') return bankJobsView();
   if (S.tab === 'inspector') return inspectorView();
   if (S.tab === 'hotel') {
-    const h = bankHotel(), owned = Object.values(S.shops).filter(x => x.ownerId === 'bank' && x !== h);
+    const owned = Object.values(S.shops).filter(x => x.ownerId === 'bank');
+    if (!owned.length) return '<div class="empty">The bank doesn’t own any businesses right now. Businesses it forecloses on show up here.</div>';
     const sellForm = sh => { const t = bizType(sh), buyers = playerList().filter(p => bizCount(p.id) < bizLimit() && !Object.values(S.shops).some(x => x.ownerId === p.id && bizType(x) === t)); return `<section class="panel"><h3>Sell ${esc(sh.name)}</h3><p class="muted" style="font-size:.88rem">${sh.seizedFor === 'audit' ? 'Taken after two failed tax audits' : 'Foreclosed'} from ${esc(nameOf(sh.prevOwner))} on Day ${sh.foreclosedDay}. The buyer pays from checking and gets a fresh license.</p>${buyers.length ? `<form class="inline" data-form="sellBiz" data-id="${sh.id}"><label>Buyer<select id="sb-who-${sh.id}" required><option value="">Choose…</option>${buyers.map(p => `<option value="${p.id}">${esc(p.name)} · ${money(bal(balances(), p.id, 'c'))} in checking</option>`).join('')}</select></label><label>Price<input id="sb-p-${sh.id}" inputmode="decimal" value="${(bizValue(sh) / 100).toFixed(2)}"></label><button class="btn">Sell</button></form>` : '<p class="muted">Every resident already owns this kind of business.</p>'}</section>`; };
-    return (h ? manageBiz(h) : `<section class="panel" style="max-width:640px"><h2>Open the town hotel</h2><p class="muted">The hotel belongs to the town. Kids book rooms on Main Street and tourists fill some rooms each night. All of that money goes to the bank. Kids can still buy shares in it.</p><form data-form="openHotel"><label>Hotel name<input id="oh-n" required maxlength="40" placeholder="Grand Pine Hotel"></label><label>Description<input id="oh-d" maxlength="100" placeholder="Cozy rooms, a pool and free breakfast"></label><div><button class="btn">Open the hotel</button></div></form></section>`) + owned.map(sh => `<hr style="border:0;border-top:2px dashed var(--line);margin:8px 0;width:100%">${sellForm(sh)}${manageBiz(sh)}`).join('');
+    return owned.map(sh => `${sellForm(sh)}${manageBiz(sh)}`).join('');
   }
   const b = balances(), ps = playerList();
   if (S.tab === 'town') {
@@ -1787,7 +1935,7 @@ function bankView() {
       <div class="stat"><b>${money(owed)}</b><span>Owed on loans & mortgages</span></div><div class="stat"><b>${money(unpaid.reduce((s, x) => s + x.total, 0))}</b><span>Unpaid bills (${unpaid.length})</span></div></div>
     <div class="cols"><div class="stack">
       <section class="panel"><h3>Residents</h3>${ps.length ? `<div class="tbl-wrap"><table><thead><tr><th>Name</th><th>Home</th><th class="r">Checking</th><th class="r">Savings</th><th class="r">Net worth</th><th class="r">Bills</th><th class="r">Credit</th></tr></thead><tbody>
-        ${ps.map(p => { const c = credit(p.id), ob = openBills(p.id); return `<tr><td><b>${esc(p.name)}</b><br><small class="muted">${esc(p.job || 'No job')}</small></td><td>${p.home ? esc(p.home.name) + `<br><small class="muted">${p.home.mode === 'rent' ? 'Renting' : p.home.mode === 'mortgage' ? 'Mortgage' : 'Owns'}</small>` : '<small class="muted">None</small>'}</td><td class="r num ${bal(b, p.id, 'c') < 0 ? 'neg' : ''}">${money(bal(b, p.id, 'c'))}</td><td class="r num">${money(bal(b, p.id, 's'))}</td><td class="r num">${money(netWorth(p.id, b))}</td><td class="r">${ob.length ? `<span class="pill ${ob.some(x => x.status === 'late') ? 'bad' : 'warn'}">${ob.length} open</span>` : '<span class="pill good">Paid</span>'}</td><td class="r"><span class="pill ${c.band[1]}">${c.score}</span></td></tr>`; }).join('')}
+        ${ps.map(p => { const c = credit(p.id), ob = openBills(p.id); return `<tr><td><b>${esc(p.name)}</b><br><small class="muted">${esc(p.job || 'No job')}</small></td><td>${p.jail ? '<span class="pill bad">In jail</span>' : p.home ? esc(p.home.name) + `<br><small class="muted">${p.home.mode === 'rent' ? 'Renting' : p.home.mode === 'mortgage' ? 'Mortgage' : 'Owns'}</small>` : '<small class="muted">None</small>'}</td><td class="r num ${bal(b, p.id, 'c') < 0 ? 'neg' : ''}">${money(bal(b, p.id, 'c'))}</td><td class="r num">${money(bal(b, p.id, 's'))}</td><td class="r num">${money(netWorth(p.id, b))}</td><td class="r">${ob.length ? `<span class="pill ${ob.some(x => x.status === 'late') ? 'bad' : 'warn'}">${ob.length} open</span>` : '<span class="pill good">Paid</span>'}</td><td class="r"><span class="pill ${c.band[1]}">${c.score}</span></td></tr>`; }).join('')}
         </tbody></table></div>` : `<div class="empty">Add residents under the Residents tab.</div>`}</section>
       <section class="panel"><div class="panel-head"><h3>Town ledger</h3><span class="muted" style="font-size:.85rem">Tap Reverse to undo a transaction</span></div>
         <div class="row" style="gap:6px">${[['', 'Everyone'], ...ps.map(p => [p.id, p.name])].map(([id, n]) => `<button class="btn ${(S.ledgerWho || '') === id ? '' : 'ghost'} sm" data-act="ledgerWho" data-id="${id}">${esc(n)}</button>`).join('')}</div>
@@ -1801,6 +1949,10 @@ function bankView() {
           <label>Amount<input id="ad-amt" inputmode="decimal" required placeholder="0.00"></label></div>
           <label>Reason<input id="ad-memo" maxlength="60" placeholder="Great job cleaning your room"></label>
           <div><button class="btn">Record it</button></div></form></section>
+      ${(() => { const jailed = ps.filter(p => p.jail), soon = ps.filter(p => !p.home && !p.jail), records = ps.filter(p => !p.jail && Number(p.jailCount || 0) > 0); return jailed.length || soon.length || records.length ? `<section class="panel"><h3>Town jail</h3>
+        ${jailed.length ? `<div class="list">${jailed.map(p => `<div class="li"><div class="main"><b>${esc(p.name)}</b><small>In since Day ${p.jail.since}${p.jail.stay > 1 ? ' · stay #' + p.jail.stay : ''} · work release ${p.jail.solved} of ${p.jail.needed} · bail ${money(p.jail.bail ?? cfg('bailAmount'))}</small></div><button class="btn ghost sm" data-act="jailRelease" data-id="${p.id}">Release</button></div>`).join('')}</div>` : '<p class="muted">Nobody is in jail.</p>'}
+        ${records.length ? `<div class="list">${records.map(p => `<div class="li"><div class="main"><b>${esc(p.name)} · ${p.jailCount} jail stay${p.jailCount === 1 ? '' : 's'}</b><small>${esc(restrictText(p.id).join(', ') || 'No active restrictions')}</small></div><button class="btn ghost sm" data-act="clearRecord" data-id="${p.id}">Clear record</button></div>`).join('')}</div>` : ''}
+        ${soon.length ? `<p class="muted" style="font-size:.85rem">No home yet: ${soon.map(p => `${esc(p.name)} (jail after Day ${jailDeadline(p)})`).join(', ')}</p>` : ''}</section>` : ''; })()}
       <section class="panel"><h3>Send a bill</h3><p class="muted" style="font-size:.88rem">Life has surprise costs. Bills go to the Bills tab with a due date, and the resident gets a message.</p>
         <div class="row"><button class="btn gold sm" data-act="surprise" data-id="one">Surprise bill to a random resident</button><button class="btn ghost sm" data-act="surprise" data-id="all">Surprise bill to everyone</button></div>
         <form data-form="customBill"><div class="fields">
@@ -1827,7 +1979,7 @@ function bankView() {
     const willPay = d % every('payEvery') === 0, willInt = d % every('interestEvery') === 0, willBill = d % every('billEvery') === 0, willRent = d % every('rentEvery') === 0;
     const willLate = S.bills.filter(x => x.status === 'due' && x.dueDay < d), willCd = S.cds.filter(c => c.status === 'open' && c.matureDay <= d);
     const housed = ps.filter(p => p.home && p.home.mode !== 'own').length;
-    const happens = [willPay && `Payday: ${paid.length} paycheck${paid.length === 1 ? '' : 's'}${S.settings.payBonus ? ` with a ${S.settings.payBonus}% bonus` : ''}`, willBill && `Utility bills to ${ps.length} resident${ps.length === 1 ? '' : 's'} (${money(billTotal())} each)`, willRent && housed && `Rent and mortgage bills for ${housed} home${housed > 1 ? 's' : ''}`, willInt && `Interest day for loans and savings${Number(S.settings.savingsBoost || 1) > 1 ? ' (savings doubled)' : ''}`, willCd.length && `${willCd.length} CD${willCd.length > 1 ? 's' : ''} mature and pay out`, willLate.length && `${willLate.length} unpaid bill${willLate.length > 1 ? 's' : ''} turn late (+${money(cfg('lateFee'))} fee each)`, d % every('lotteryEvery') === 0 && lottoTickets().length && `Lottery drawing: ${lottoTickets().length} tickets, ${money(lottoPot())} jackpot`, cfg('gigsPerDay') > 0 && ps.length && `${Math.round(cfg('gigsPerDay'))} new odd jobs on the board`, Object.values(S.shops).filter(sh => sh.license?.status === 'active' && sh.license.expiresDay < d).length && `${Object.values(S.shops).filter(sh => sh.license?.status === 'active' && sh.license.expiresDay < d).length} business license(s) expire`, Object.values(S.shops).filter(sh => sh.inspection?.nextDue === d).length && `${Object.values(S.shops).filter(sh => sh.inspection?.nextDue === d).length} inspection(s) come due`, d % every('dividendEvery') === 0 && S.holdings.some(h => h.shares > 0) && `Profit sharing day: shareholders get ${cfg('profitShare')}% of each business’s profit`, ps.length && cfg('needsCount') > 0 && `Yesterday’s daily needs are checked: ${money(cfg('needsBonus'))} bonus for meeting all, ${money(cfg('needsPenalty'))} for each missed`, cfg('surpriseChance') > 0 && ps.length && `${Math.round(cfg('surpriseChance'))}% chance of a surprise bill`, cfg('marketChance') > 0 && !marketActive(d) && `${Math.round(cfg('marketChance'))}% chance of a stock market boom or crash`, cfg('eventChance') > 0 && `${Math.round(cfg('eventChance'))}% chance of a town event`].filter(Boolean);
+    const happens = [willPay && `Payday: ${paid.length} paycheck${paid.length === 1 ? '' : 's'}${S.settings.payBonus ? ` with a ${S.settings.payBonus}% bonus` : ''}`, willBill && `Utility bills to ${ps.length} resident${ps.length === 1 ? '' : 's'} (${money(billTotal())} each)`, willRent && housed && `Rent and mortgage bills for ${housed} home${housed > 1 ? 's' : ''}`, willInt && `Interest day for loans and savings${Number(S.settings.savingsBoost || 1) > 1 ? ' (savings doubled)' : ''}`, willCd.length && `${willCd.length} CD${willCd.length > 1 ? 's' : ''} mature and pay out`, willLate.length && `${willLate.length} unpaid bill${willLate.length > 1 ? 's' : ''} turn late (+${money(cfg('lateFee'))} fee each)`, d % every('lotteryEvery') === 0 && lottoTickets().length && `Lottery drawing: ${lottoTickets().length} tickets, ${money(lottoPot())} jackpot`, cfg('gigsPerDay') > 0 && ps.length && `${Math.round(cfg('gigsPerDay'))} new odd jobs on the board`, Object.values(S.shops).filter(sh => sh.license?.status === 'active' && sh.license.expiresDay < d).length && `${Object.values(S.shops).filter(sh => sh.license?.status === 'active' && sh.license.expiresDay < d).length} business license(s) expire`, Object.values(S.shops).filter(sh => sh.inspection?.nextDue === d).length && `${Object.values(S.shops).filter(sh => sh.inspection?.nextDue === d).length} inspection(s) come due`, d % every('dividendEvery') === 0 && S.holdings.some(h => h.shares > 0) && `Profit sharing day: shareholders get ${cfg('profitShare')}% of each business’s profit`, ps.length && cfg('needsCount') > 0 && `Yesterday’s daily needs are checked: ${money(cfg('needsBonus'))} bonus for meeting all, ${money(cfg('needsPenalty'))} for each missed`, ps.filter(p => !p.home && !p.jail && p.homelessSince != null && d > jailDeadline(p)).length && `${ps.filter(p => !p.home && !p.jail && p.homelessSince != null && d > jailDeadline(p)).map(p => p.name).join(', ')} go${ps.filter(p => !p.home && !p.jail && p.homelessSince != null && d > jailDeadline(p)).length === 1 ? 'es' : ''} to jail (no home)`, cfg('surpriseChance') > 0 && ps.length && `${Math.round(cfg('surpriseChance'))}% chance of a surprise bill`, cfg('marketChance') > 0 && !marketActive(d) && `${Math.round(cfg('marketChance'))}% chance of a stock market boom or crash`, cfg('eventChance') > 0 && `${Math.round(cfg('eventChance'))}% chance of a town event`].filter(Boolean);
     const unpaid = S.bills.filter(x => x.status === 'due' || x.status === 'late').sort((a, c) => a.dueDay - c.dueDay);
     return `<div class="cols"><div class="stack">
       <section class="panel"><div class="panel-head"><div><p class="eyebrow">Today in ${esc(S.settings.name)}</p><div class="bigday">Day ${today()}</div></div>
@@ -1980,6 +2132,9 @@ function bankView() {
         ${Object.keys(BIZ).map(t => `<div class="fields"><label>${BIZ[t].Noun}: cost to open<input id="bc-${t}" inputmode="decimal" value="${(bizCost(t) / 100).toFixed(2)}"></label><label>Inspect every (days)<input id="br-i-${t}" type="number" min="1" value="${bizRule(t, 'inspect')}"></label><label>License lasts (days)<input id="br-l-${t}" type="number" min="1" value="${bizRule(t, 'license')}"></label></div>`).join('')}
         <div class="fields"><label>Cost of goods per sale (% of price)<input id="st-whole" inputmode="decimal" value="${cfg('wholesalePct')}"></label><label>Days to finish an inspection quiz<input id="st-insd" type="number" min="0" value="${Math.round(cfg('inspectDays'))}"></label><label>Most businesses one resident can run<input id="st-bizlim" type="number" min="1" max="8" value="${bizLimit()}"></label><label>License renewal (% of opening cost)<input id="st-renew" inputmode="decimal" value="${cfg('renewPct')}"></label></div></section>
       <section class="panel"><h3>Homes</h3><div class="fields">
+        <label>Days without a home before jail<input id="st-jd" type="number" min="1" value="${Math.round(cfg('jailDays'))}"></label>
+        <label>Bail for a 1st stay (×2 for 2nd, ×3 for 3rd+)<input id="st-bail" inputmode="decimal" value="${(cfg('bailAmount') / 100).toFixed(2)}"></label>
+        <label>Work release problems for a 1st stay (+10 each repeat)<input id="st-jp" type="number" min="1" max="100" value="${Math.round(cfg('jailProblems'))}"></label>
         <label>Mortgage interest per period (%)<input id="st-mr" inputmode="decimal" value="${cfg('mortgageRate')}"></label>
         <label>Mortgage length (payments)<input id="st-mt" type="number" min="1" value="${every('mortgageTerm')}"></label>
         <label>Down payment (%)<input id="st-dp" inputmode="decimal" value="${cfg('downPct')}"></label></div>
@@ -2011,6 +2166,7 @@ function enter(target) {
   S.pin = null; S.me = target; S.tab = null; S.thread = null;
   if (target !== 'bank') ls('ptb.me', target); else ls('ptb.me', null);
   window.scrollTo(0, 0); render();
+  if (target === 'bank' && (S.hotelsRaw || []).length) run(closeHotels);
 }
 const acts = {
   pick: id => { const p = S.players[id]; if (p?.pin) { S.pin = {target: id, digits: ''}; render(); } else enter(id); },
@@ -2094,6 +2250,25 @@ const acts = {
     await sendMsg('bank', sh.ownerId, `The license renewal for ${sh.name} was not approved. Talk to the inspector.`);
     toast('Renewal denied');
   }),
+  recAdd: fk => {
+    syncDraft(fk); const cat = ingredientCatalog(ownerForFk(fk)), rows = S.recipeDraft[fk] || (S.recipeDraft[fk] = []);
+    const used = new Set(rows.map(r => r.key)), first = Object.keys(cat).sort((a, b) => cat[a].localeCompare(cat[b])).find(k => !used.has(k)) || Object.keys(cat)[0];
+    if (!first || rows.length >= 5) return;
+    clear(...draftIds(fk)); rows.push({key: first, name: cat[first], qty: 1}); render();
+  },
+  recDel: key => { const i = key.lastIndexOf(':'), fk = key.slice(0, i), idx = Number(key.slice(i + 1)); syncDraft(fk); clear(...draftIds(fk)); (S.recipeDraft[fk] || []).splice(idx, 1); render(); },
+  recEdit: id => { if (S.editRecipe) { clear(...draftIds('it-' + S.editRecipe)); delete S.recipeDraft['it-' + S.editRecipe]; } S.editRecipe = id || null; render(); },
+  payBail: () => run(async () => {
+    const p = S.players[S.me]; if (!p?.jail) fail('You’re not in jail.');
+    const bail = p.jail.bail ?? cfg('bailAmount'), b = balances(), c = Math.max(0, bal(b, S.me, 'c')), sv = Math.max(0, bal(b, S.me, 's'));
+    if (c + sv < bail) fail(`You need ${money(bail)} for bail.`);
+    const fromC = Math.min(c, bail), fromS = bail - fromC;
+    if (fromC > 0) await addTx(S.me + '.c', 'bank', fromC, 'adjust', 'Paid bail to get out of jail');
+    if (fromS > 0) await addTx(S.me + '.s', 'bank', fromS, 'adjust', 'Paid bail to get out of jail (from savings)');
+    await releaseFromJail(S.me, 'bail paid'); S.tab = 'housing'; toast('You’re free! Go find a home.');
+  }),
+  clearRecord: pid => confirmIt(`Clear ${nameOf(pid)}’s jail record?`, 'Their jail stays reset to zero, their credit points come back, and all lottery, loan, business and stock restrictions are lifted.', 'Clear record', async () => { await db.doc('players/' + pid).update({jailCount: 0, restrict: null}); await sendMsg('bank', pid, 'The banker cleared your jail record. Fresh start!'); toast('Record cleared'); }),
+  jailRelease: pid => confirmIt(`Release ${nameOf(pid)} from jail?`, 'They get out free and their 3-day home clock starts over.', 'Release', async () => { await releaseFromJail(pid, 'released by the banker'); toast(`${nameOf(pid)} released`); }),
   quizAnswer: key => run(async () => {
     const [sid, i] = key.split(':'), sh = S.shops[sid]; if (!sh || !quizPending(sh) || sh.ownerId !== S.me) fail('That inspection is over.');
     const z = sh.quiz, cur = z.questions[z.idx]; if (!cur) fail('That inspection is over.');
@@ -2103,8 +2278,8 @@ const acts = {
     if (next.idx >= QUIZ_N) { const g = await finishInspection(sh, next, today()); toast(`Inspection done: Grade ${g}${FAIL_GRADES.includes(g) ? '. Your business is closed until you pass.' : '!'}`, FAIL_GRADES.includes(g)); }
     else { await db.doc('shops/' + sid).update({quiz: next}); toast(ok ? 'Correct!' : `Not quite. The answer was ${cur.answer}.`, !ok); }
   }),
-  inspectStart: id => run(async () => { if (quizPending(S.shops[id])) fail('That business already has an inspection going.'); await startInspection(id, today(), false); toast('Inspection quiz sent'); }),
-  inspectSurpriseQuiz: id => run(async () => { if (quizPending(S.shops[id])) fail('That business already has an inspection going.'); await startInspection(id, today(), true); toast('Surprise inspection sent!'); }),
+  inspectStart: id => run(async () => { if (inJail(S.shops[id]?.ownerId)) fail('The owner is in jail. Inspections are paused until they’re out.'); if (quizPending(S.shops[id])) fail('That business already has an inspection going.'); await startInspection(id, today(), false); toast('Inspection quiz sent'); }),
+  inspectSurpriseQuiz: id => run(async () => { if (inJail(S.shops[id]?.ownerId)) fail('The owner is in jail. Inspections are paused until they’re out.'); if (quizPending(S.shops[id])) fail('That business already has an inspection going.'); await startInspection(id, today(), true); toast('Surprise inspection sent!'); }),
   inspectOpen: id => { S.inspecting = S.inspecting === id ? null : id; S.inspectSurprise = false; render(); },
   inspectSurprise: id => { S.inspecting = id; S.inspectSurprise = true; render(); },
   inspectKind: key => { const [sid, k] = key.split(':'); S.inspectType = {...S.inspectType, [sid]: k}; render(); },
@@ -2112,6 +2287,7 @@ const acts = {
   pickNum: n => { n = Number(n); const p = S.picks || []; S.picks = p.includes(n) ? p.filter(x => x !== n) : p.length >= 3 ? p : [...p, n].sort((a, b) => a - b); render(); },
   quickPick: () => { const max = Math.max(4, every('pick3Max')); S.picks = Array.from({length: max}, (_, i) => i + 1).sort(() => Math.random() - .5).slice(0, 3).sort((a, b) => a - b); render(); },
   buyLotto: () => run(async () => {
+    if (noLottery(S.me)) fail(restr(S.me).lotteryBan ? 'You’re banned from the lottery because of your jail record.' : `No lottery until after Day ${restr(S.me).lotteryUntil} because of your jail record.`);
     const nums = (S.picks || []).slice(); if (nums.length !== 3) fail('Pick 3 numbers first.');
     const price = cfg('pick3Price'); if (bal(balances(), S.me, 'c') < price) fail(`A ticket costs ${money(price)}. Not enough in checking.`);
     const drawNo = lotto().drawNo;
@@ -2120,6 +2296,7 @@ const acts = {
     S.picks = []; toast(`Ticket ${nums.join(' · ')} bought. Good luck!`);
   }),
   buyScratch: () => run(async () => {
+    if (noLottery(S.me)) fail('Your jail record means no lottery or scratch-offs right now.');
     const lim = Math.round(cfg('scratchLimit')); if (lim > 0 && scratchesToday(S.me) >= lim) fail(`That’s ${lim} scratch-offs today, the daily limit. Come back tomorrow!`);
     const price = cfg('scratchPrice'); if (bal(balances(), S.me, 'c') < price) fail(`A scratch-off costs ${money(price)}. Not enough in checking.`);
     const o = scratchDraw();
@@ -2139,12 +2316,12 @@ const acts = {
   lottoReveal: () => {
     const last = (S.settings.lotteryHistory || [])[0]; if (!last) return;
     S.reveal = {drawNo: last.drawNo, shown: 0}; render();
-    [1, 2, 3].forEach(k => setTimeout(() => { if (S.reveal && S.reveal.drawNo === last.drawNo) { S.reveal.shown = k; if (k === 3) ls('ptb.lotto.seen.' + S.me, String(last.drawNo)); render(); } }, k * 900));
+    [1, 2, 3].forEach(k => setTimeout(() => { if (S.reveal && S.reveal.drawNo === last.drawNo) { S.reveal.shown = k; if (k === 3) { ls('ptb.lotto.seen.' + S.me, String(last.drawNo)); setTimeout(() => { S.reveal = null; schedule(); }, 1200); } render(); } }, k * 900));
   },
   paperDay: d => { S.paperDay = Math.min(today(), Math.max(1, parseInt(d, 10) || today())); window.scrollTo(0, 0); render(); },
   dropStory: id => confirmIt('Remove this story?', 'It comes out of the Gazette for everyone.', 'Remove', async () => { await db.doc('messages/' + id).delete(); toast('Story removed'); }, true),
   finePreset: i => { const f = FINES[i]; if (!f) return; const w = document.getElementById('fn-why'), a = document.getElementById('fn-amt'); if (w) w.value = f[0]; if (a) a.value = (f[1] / 100).toFixed(2); },
-  tab: id => { S.tab = id; S.paperDay = null; window.scrollTo(0, 0); render(); },
+  tab: id => { S.tab = id; S.paperDay = null; S.anim = true; window.scrollTo(0, 0); render(); },
   modalNo: () => { S.modal = null; render(); },
   modalYes: () => { const f = S.modal?.fn; S.modal = null; render(); if (f) run(f); },
   advance: () => {
@@ -2196,12 +2373,13 @@ const acts = {
     const qty = parseInt(val('q-' + id), 10); if (!(qty >= 1)) fail('Choose how many.');
     const isHotel = bizType(shop) === 'hotel', stay = isHotel ? hotelDay(shop.id) : null;
     if (isHotel) { const f = roomsFree(shop, it, stay); if (f < qty) fail(f ? `Only ${f} room${f > 1 ? 's' : ''} free that night.` : 'No rooms free that night. Try another night.'); }
+    else if (isDaily(shop)) { const left = slotsLeft(it); if (left < qty) fail(left ? `Only ${left} left today.` : `${it.name}: ${outToday(BIZ[bizType(shop)]).toLowerCase()}`); }
     else if (it.stock != null && it.stock < qty) fail(`Only ${it.stock} left.`);
     if (it.recipe?.length && canMake(shop, it) < qty) fail(canMake(shop, it) > 0 ? `${shop.name} only has ingredients for ${canMake(shop, it)} right now.` : `${shop.name} is out of ingredients for ${it.name}.`);
     const sub = unit * qty, tipPct = isR ? (parseFloat(val('tip-' + shop.id)) || 0) : 0, tip = Math.round(sub * tipPct / 100), total = sub + tip;
     if (bal(balances(), S.me, 'c') < total) fail(`Not enough in checking. You need ${money(total)}.`);
     await addTx(S.me + '.c', acctOf(shop.ownerId), total, bizType(shop) === 'restaurant' ? 'meal' : 'purchase', `${qty} × ${it.name} at ${shop.name}` + (isHotel ? ` for the night of Day ${stay}` : '') + (pct ? ` (${pct}% off)` : '') + (tip ? ` + ${money(tip)} tip` : ''));
-    if (!isHotel && it.stock != null) await db.doc('items/' + id).update({stock: it.stock - qty});
+    if (!isHotel && !isDaily(shop) && it.stock != null) await db.doc('items/' + id).update({stock: it.stock - qty});
     if (it.recipe?.length) {
       const upd = {}; for (const r of it.recipe) upd['pantry.' + r.key] = Math.max(0, (pantryOf(shop)[r.key] || 0) - r.qty * qty);
       await db.doc('shops/' + shop.id).update(upd);
@@ -2226,7 +2404,7 @@ const acts = {
       if (o.sellerId !== 'bank' && bal(balances(), o.sellerId, 'c') < o.total) fail('Not enough in your checking to refund.');
       await addTx(acctOf(o.sellerId), o.buyerId + '.c', o.total, 'refund', `Refund: ${o.qty} × ${o.itemName}`);
       await db.doc('orders/' + id).update({status: 'refunded'});
-      const it = S.items[o.itemId]; if (it && it.stock != null && o.bizType !== 'hotel') await db.doc('items/' + o.itemId).update({stock: it.stock + o.qty});
+      const it = S.items[o.itemId]; if (it && it.stock != null && o.bizType !== 'hotel' && !BIZ[o.bizType]?.daily) await db.doc('items/' + o.itemId).update({stock: it.stock + o.qty});
       toast('Refunded');
     });
   },
@@ -2264,6 +2442,7 @@ const acts = {
     await db.doc('shops/' + id).delete(); toast('Closed');
   }, true),
   buyStock: shopId => run(async () => {
+    if (noStocks(S.me)) fail(`You can’t buy stocks until after Day ${restr(S.me).stocksUntil} because of your jail record.`);
     const shop = S.shops[shopId]; if (!shop) fail('That business closed.');
     if (shop.ownerId === S.me) fail('You can’t buy shares in your own business.');
     const n = parseInt(val('sb-' + shopId), 10); if (!(n >= 1)) fail('Choose how many shares.');
@@ -2305,6 +2484,7 @@ const acts = {
     });
   },
   applyMortgage: i => run(async () => {
+    if (noLoans(S.me)) fail(`The bank won’t give you a mortgage until after Day ${restr(S.me).loansUntil} because of your jail record.`);
     const x = homes()[i]; if (!x) fail('That home is gone.');
     if (S.players[S.me]?.home) fail('Move out of your current home first.');
     if (tellerOf(S.me).some(t => t.kind === 'mortgage' && t.status === 'waiting')) fail('You already have a mortgage application waiting.');
@@ -2400,6 +2580,7 @@ const forms = {
     clear('ps-h', 'ps-t'); toast('Published in today’s Gazette!');
   },
   startAudit: async () => {
+    if (val('au-who') !== 'random' && inJail(val('au-who'))) fail('That resident is in jail. Audits are paused until they’re out.');
     const who = val('au-who'), pool = ownersList().filter(p => !auditPending(p.id));
     const p = who === 'random' ? pickRandom(pool) : S.players[who];
     if (!p) fail('Nobody is available to audit right now.');
@@ -2446,6 +2627,16 @@ const forms = {
     if (post && changes.length) await announce('bank', 'rates', text);
     clear('rt-sav', 'rt-loan', 'rt-mort', 'rt-cd', 'rt-apply', 'rt-post');
     toast(changes.length ? 'Rates updated' + (post ? ' and announced' : '') : `Updated ${active.length} active loan${active.length > 1 ? 's' : ''}`);
+  },
+  jailAnswer: async () => {
+    const p = S.players[S.me], j = p?.jail; if (!j) fail('You’re not in jail.');
+    const given = parseFloat(String(val('jl-ans')).replace(/[^0-9.\-]/g, '')); if (!isFinite(given)) fail('Type your answer as a number.');
+    const ok = Math.abs(given - j.a) < 0.005, solved = j.solved + (ok ? 1 : 0), needed = j.needed + (ok ? 0 : 1);
+    clear('jl-ans');
+    if (ok && solved >= needed) { await releaseFromJail(S.me, 'work release finished'); S.tab = 'housing'; toast('Work release done. You’re free! Go find a home.'); return; }
+    const pr = jailProblem(S.me);
+    await db.doc('players/' + S.me).update({jail: {...j, solved, needed, wrong: j.wrong + (ok ? 0 : 1), q: pr.q, a: pr.a}});
+    if (ok) toast(`Correct! ${needed - solved} to go.`); else fail(`Not quite. The answer was ${j.a}. One more problem added.`);
   },
   auditAnswer: async () => {
     const a = auditOf(S.me); if (!a || a.status !== 'pending') fail('There’s no audit open.');
@@ -2548,6 +2739,7 @@ const forms = {
     clear('oh-n', 'oh-d'); toast(`${name} is open`);
   },
   openBiz: async () => {
+    if (noNewBiz(S.me)) fail(`You can’t open a business until after Day ${restr(S.me).bizUntil} because of your jail record.`);
     const t = val('ob-type'); if (!BIZ[t] || BIZ[t].bankOnly) fail('Pick a kind of business.');
     if (bizCount(S.me) >= bizLimit()) fail(`You can run up to ${bizLimit()} businesses. Close one first.`);
     if (Object.values(S.shops).some(s => s.ownerId === S.me && bizType(s) === t)) fail(`You already have a ${BIZ[t].noun}.`);
@@ -2569,14 +2761,16 @@ const forms = {
     const price = toCents(val('ai-p-' + sid)); if (!(price >= 0)) fail('Enter a price.');
     const st = val('ai-s-' + sid).trim();
     if (bizType(shop) === 'hotel' && !(parseInt(st, 10) > 0)) fail('Set how many rooms of this type.');
+    if (isDaily(shop) && !(parseInt(st, 10) > 0)) fail(`Set how many you can do each day (${BIZ[bizType(shop)].stockLbl.toLowerCase()}).`);
     if (needsStock(shop)) {
       const qty = Math.max(0, parseInt(st, 10) || 0), cost = qty * unitCost({price});
       if (shop.ownerId !== 'bank' && cost > 0 && bal(balances(), S.me, 'c') < cost) fail(`${qty} to start would cost ${money(cost)}. Not enough in checking. Try fewer.`);
       if (cost > 0) await addTx(acctOf(shop.ownerId), 'bank', cost, 'supply', `Stocked ${qty} × ${val('ai-n-' + sid).trim()} for ${shop.name}`, {shopId: sid});
     }
     await announce(S.me, 'price', `New at ${shop.name}: ${val('ai-n-' + sid).trim()} for ${money(price)}${bizType(shop) === 'hotel' ? ' a night' : ''}.`, {shopId: sid, isNew: true});
-    await db.collection('items').add({shopId: sid, recipe: parseRecipe(val('ai-r-' + sid)), name: val('ai-n-' + sid).trim(), price, stock: st === '' ? null : Math.max(0, parseInt(st, 10)), at: Date.now()});
-    clear('ai-n-' + sid, 'ai-p-' + sid, 'ai-s-' + sid, 'ai-r-' + sid); toast('Added');
+    const recipe = draftRecipe('new-' + sid), newIds = draftIds('new-' + sid);
+    await db.collection('items').add({shopId: sid, recipe, name: val('ai-n-' + sid).trim(), price, stock: st === '' ? null : Math.max(0, parseInt(st, 10)), at: Date.now()});
+    clear('ai-n-' + sid, 'ai-p-' + sid, 'ai-s-' + sid, ...newIds); delete S.recipeDraft['new-' + sid]; toast('Added');
   },
   restock: async id => {
     const it = S.items[id], shop = it && S.shops[it.shopId]; if (!it || !shop) fail('That item is gone.');
@@ -2594,20 +2788,20 @@ const forms = {
   },
   editRecipe: async id => {
     const it = S.items[id]; if (!it) fail('That item is gone.');
-    const recipe = parseRecipe(val('er-' + id));
+    const fk = 'it-' + id, recipe = draftRecipe(fk), ids = draftIds(fk);
     await db.doc('items/' + id).update({recipe});
-    clear('er-' + id); toast(recipe.length ? `${it.name} now needs ${recipeText(recipe)}` : `${it.name} needs no ingredients`);
+    clear(...ids); delete S.recipeDraft[fk]; S.editRecipe = null; toast(recipe.length ? `${it.name} now needs ${recipeText(recipe)}` : `${it.name} needs no ingredients`);
   },
   buyIng: async key => {
     const [sid, k] = key.split('|'), shop = S.shops[sid]; if (!shop) fail('That business is closed.');
     const src = S.items[val(`bi-s-${sid}-${k}`)], seller = src && S.shops[src.shopId], qty = parseInt(val(`bi-q-${sid}-${k}`), 10);
     if (!src || !seller || !isOpenBiz(seller)) fail('That seller isn’t available right now.');
     if (!(qty >= 1)) fail('Choose how many to buy.');
-    if (src.stock != null && src.stock < qty) fail(`${seller.name} only has ${src.stock} left.`);
+    if (isDaily(seller)) { const left = slotsLeft(src); if (left < qty) fail(left ? `${seller.name} only has ${left} left today.` : `${seller.name} is sold out of ${src.name} today.`); } else if (src.stock != null && src.stock < qty) fail(`${seller.name} only has ${src.stock} left.`);
     const cost = qty * src.price;
     if (shop.ownerId !== 'bank' && bal(balances(), shop.ownerId, 'c') < cost) fail(`${qty} × ${src.name} costs ${money(cost)}. Not enough in checking.`);
-    await addTx(acctOf(shop.ownerId), acctOf(seller.ownerId), cost, 'supply', `${shop.name} bought ${qty} × ${src.name} from ${seller.name}`, {shopId: shop.id, supplierShopId: seller.id});
-    if (src.stock != null) await db.doc('items/' + src.id).update({stock: src.stock - qty});
+    await addTx(acctOf(shop.ownerId), acctOf(seller.ownerId), cost, 'supply', `${shop.name} bought ${qty} × ${src.name} from ${seller.name}`, {shopId: shop.id, supplierShopId: seller.id, ingItemId: src.id, qty});
+    if (!isDaily(seller) && src.stock != null) await db.doc('items/' + src.id).update({stock: src.stock - qty});
     await db.doc('shops/' + sid).update({['pantry.' + k]: (pantryOf(shop)[k] || 0) + qty});
     if (seller.ownerId !== 'bank') await sendMsg('bank', seller.ownerId, `${shop.name} bought ${qty} × ${src.name} from ${seller.name} for ${money(cost)}. It’s in your checking!`);
     clear(`bi-q-${sid}-${k}`); toast(`Bought ${qty} × ${src.name} for ${money(cost)}`);
@@ -2615,11 +2809,12 @@ const forms = {
   editItem: async id => {
     const price = toCents(val('ei-p-' + id)); if (!(price >= 0)) fail('Enter a price.');
     const st = val('ei-s-' + id).trim(), it = S.items[id], shop = it && S.shops[it.shopId];
-    await db.doc('items/' + id).update(shop && needsStock(shop) ? {price} : {price, stock: st === '' ? null : Math.max(0, parseInt(st, 10))});
+    await db.doc('items/' + id).update(shop && needsStock(shop) ? {price} : shop && isDaily(shop) ? {price, stock: Math.max(1, parseInt(st, 10) || DEFAULT_SLOTS)} : {price, stock: st === '' ? null : Math.max(0, parseInt(st, 10))});
     if (it && shop && price !== it.price) await announce(S.me, 'price', `Price change at ${shop.name}: ${it.name} ${price > it.price ? 'goes up' : 'drops'} from ${money(it.price)} to ${money(price)}${bizType(shop) === 'hotel' ? ' a night' : ''}.`, {shopId: shop.id, up: price > it.price});
     clear('ei-p-' + id, 'ei-s-' + id); toast('Saved');
   },
   request: async () => {
+    if (noLoans(S.me)) fail(`The bank won’t lend to you until after Day ${restr(S.me).loansUntil} because of your jail record.`);
     const amt = toCents(val('lr-amt')), cr = credit(S.me);
     if (!(amt > 0)) fail('Enter how much you want to borrow.');
     if (amt > cr.avail) fail(`Your credit limit lets you borrow up to ${money(cr.avail)}.`);
@@ -2677,10 +2872,10 @@ const forms = {
       name: val('st-name').trim(), symbol: val('st-sym').trim() || '$', bankerPin: pin, day: ints('st-day', 1), eventChance: Math.min(100, n('st-ev')), surpriseChance: Math.min(100, n('st-surp')), auditChance: Math.min(100, n('st-aud')), auditFine: c('st-audf'), auditDays: ints('st-audd', 0), auditPass: Math.min(5, ints('st-audp', 1)),
       payEvery: ints('st-payev', 1), billEvery: ints('st-billev', 1), rentEvery: ints('st-rentev', 1), billGrace: ints('st-grace', 0), interestEvery: ints('st-intev', 1),
       taxRate: n('st-tax'), savingsRate: n('st-sav'), loanRate: n('st-loan'), lateFee: c('st-late'), cdRate: n('st-cdr'), cdDays: ints('st-cdd', 1), cdPenalty: Math.min(100, n('st-cdp')),
-      mortgageRate: n('st-mr'), mortgageTerm: ints('st-mt', 1), downPct: Math.min(100, n('st-dp')), utilities, homes: homesList,
+      mortgageRate: n('st-mr'), jailDays: ints('st-jd', 1), bailAmount: c('st-bail'), jailProblems: Math.min(100, ints('st-jp', 1)), mortgageTerm: ints('st-mt', 1), downPct: Math.min(100, n('st-dp')), utilities, homes: homesList,
       pick3Price: c('st-lp'), lotteryEvery: ints('st-le', 1), pick3Max: Math.min(40, ints('st-lm', 4)), pick3Share: Math.min(100, n('st-ls')), pick3Seed: c('st-lseed'), pick3Boost: c('st-lboost'), pick3Match2: c('st-lm2'), pick3Match1: c('st-lm1'), scratchPrice: c('st-scr'), scratchLimit: ints('st-scrl', 0), gigsPerDay: Math.min(16, ints('st-gigs', 0)), bizCosts: Object.fromEntries(Object.keys(BIZ).map(t => [t, c('bc-' + t)])), bizRules: Object.fromEntries(Object.keys(BIZ).map(t => [t, {inspect: ints('br-i-' + t, 1), license: ints('br-l-' + t, 1)}])), renewPct: Math.min(200, n('st-renew')), bizLimit: Math.min(8, ints('st-bizlim', 1)), inspectDays: ints('st-insd', 0), wholesalePct: Math.min(100, n('st-whole')), stockSwing: Math.min(50, n('st-swing')), marketChance: Math.min(100, n('st-mkt')), profitShare: Math.min(100, n('st-psh')), needsCount: Math.min(4, ints('st-ndn', 0)), needsBonus: c('st-ndb'), needsPenalty: c('st-ndp'), stampReward: c('st-stmp'), farmDiscount: Math.min(90, n('st-farm')), dividendEvery: ints('st-pse', 1),
     });
-    const all = ['st-name','st-sym','st-pin','st-day','st-ev','st-surp','st-aud','st-audf','st-audd','st-audp','st-payev','st-billev','st-rentev','st-grace','st-intev','st-tax','st-sav','st-loan','st-late','st-cdr','st-cdd','st-cdp','st-mr','st-mt','st-dp','st-lp','st-le','st-lm','st-ls','st-lseed','st-lboost','st-lm2','st-lm1','st-scr','st-scrl','st-gigs','st-swing','st-mkt','st-psh','st-pse','st-ndn','st-ndb','st-ndp','st-stmp','st-farm'];
+    const all = ['st-name','st-sym','st-pin','st-day','st-ev','st-surp','st-aud','st-audf','st-audd','st-audp','st-payev','st-billev','st-rentev','st-grace','st-intev','st-tax','st-sav','st-loan','st-late','st-cdr','st-cdd','st-cdp','st-mr','st-mt','st-dp','st-jd','st-bail','st-jp','st-lp','st-le','st-lm','st-ls','st-lseed','st-lboost','st-lm2','st-lm1','st-scr','st-scrl','st-gigs','st-swing','st-mkt','st-psh','st-pse','st-ndn','st-ndb','st-ndp','st-stmp','st-farm'];
     Object.keys(BIZ).forEach(t => all.push('bc-' + t, 'br-i-' + t, 'br-l-' + t)); all.push('st-renew', 'st-bizlim', 'st-whole', 'st-insd');
     for (let i = 0; i < 4; i++) all.push('ut-n-' + i, 'ut-a-' + i, 'hm-n-' + i, 'hm-r-' + i, 'hm-p-' + i);
     clear(...all); toast('Settings saved');
@@ -2718,7 +2913,7 @@ app.addEventListener('submit', e => {
   const map = (name, key) => db.collection(name).onSnapshot(q => { const o = {}; q.docs.forEach(d => o[d.id] = {id: d.id, ...d.data()}); S[key] = o; schedule(); }, onErr);
   const list = (name, key) => db.collection(name).onSnapshot(q => { S[key] = q.docs.map(d => ({id: d.id, ...d.data()})).sort((a, b) => (b.at || 0) - (a.at || 0)); schedule(); }, onErr);
   const bootAt = Date.now() - 5000;
-  map('players', 'players'); list('tx', 'tx'); map('shops', 'shops'); map('items', 'items');  map('loans', 'loans');
+  map('players', 'players'); list('tx', 'tx'); db.collection('shops').onSnapshot(q => { const o = {}, h = []; q.docs.forEach(d => { const v = {id: d.id, ...d.data()}; if (v.type === 'hotel') h.push(v); else o[d.id] = v; }); S.shops = o; S.hotelsRaw = h; if (h.length && S.me === 'bank') run(closeHotels); schedule(); }, onErr); map('items', 'items');  map('loans', 'loans');
   list('bills', 'bills'); list('holdings', 'holdings'); list('teller', 'teller'); list('cds', 'cds'); list('lottery', 'lottoTickets'); list('gigs', 'gigs');
   db.collection('orders').onSnapshot(q => {
     S.orders = q.docs.map(d => ({id: d.id, ...d.data()})).sort((a, b) => (b.at || 0) - (a.at || 0));
@@ -2726,7 +2921,7 @@ app.addEventListener('submit', e => {
       for (const c of q.docChanges()) {
         const o = c.doc.data(); if ((o.at || 0) < bootAt) continue;
         const shop = S.shops[o.shopId]?.name || 'your business', T = bizOf(o.bizType);
-        if (c.type === 'added' && o.sellerId === S.me && o.buyerId !== S.me) toast(`New order: ${o.qty} × ${o.itemName} from ${nameOf(o.buyerId)} at ${shop}${o.tip ? ' (+' + money(o.tip) + ' tip)' : ''}${S.items[o.itemId]?.stock === 0 ? `. ${o.itemName} is now SOLD OUT.` : S.items[o.itemId]?.recipe?.length && canMake(S.shops[o.shopId], S.items[o.itemId]) <= 0 ? `. Out of ingredients for ${o.itemName}. Buy more in your Pantry!` : ''}`);
+        if (c.type === 'added' && o.sellerId === S.me && o.buyerId !== S.me) toast(`New order: ${o.qty} × ${o.itemName} from ${nameOf(o.buyerId)} at ${shop}${o.tip ? ' (+' + money(o.tip) + ' tip)' : ''}${S.items[o.itemId] && S.shops[o.shopId] && isDaily(S.shops[o.shopId]) && slotsLeft(S.items[o.itemId]) === 0 ? `. That’s all the ${o.itemName} for today!` : S.items[o.itemId]?.recipe?.length && canMake(S.shops[o.shopId], S.items[o.itemId]) <= 0 ? `. Out of ingredients for ${o.itemName}. Buy more in your Pantry!` : ''}`);
         if (c.type === 'modified' && o.buyerId === S.me && o.status === 'done') toast(`${shop}: your ${o.itemName} ${o.qty > 1 ? 'are' : 'is'} ${T.done.toLowerCase()}!`);
         if (c.type === 'modified' && o.buyerId === S.me && o.status === 'refunded') toast(`${shop} refunded your ${o.itemName}`);
       }
