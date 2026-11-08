@@ -232,7 +232,7 @@ const COLORS = ['#2F7D6B','#C0612B','#5B5BB5','#B0457A','#3C7FB0','#8A6D1F','#6C
 const DEFAULTS = {day: 1, payEvery: 3, billEvery: 4, billGrace: 2, interestEvery: 7, lateFee: 200, taxRate: 10, savingsRate: 2, loanRate: 5,
   rentEvery: 7, mortgageRate: 2, mortgageTerm: 10, downPct: 20, cdRate: 8, cdDays: 7, cdPenalty: 10, eventChance: 35,
   lotteryPrice: 100, lotteryEvery: 3, lotteryMax: 20, lotteryShare: 50, lotterySeed: 1000, gigsPerDay: 3, stockSwing: 8, surpriseChance: 0, renewPct: 50,
-  pick3Price: 200, pick3Max: 12, pick3Share: 40, pick3Seed: 5000, pick3Match2: 400, pick3Match1: 100, pick3Boost: 1000, scratchPrice: 100, auditChance: 15, auditFine: 300, auditDays: 1, scratchLimit: 5, marketChance: 10, bizLimit: 2, auditPass: 3, wholesalePct: 50, homeGrace: 1, profitShare: 20, dividendEvery: 7, needsCount: 3, needsBonus: 300, needsPenalty: 100, stampReward: 200, farmDiscount: 20, autoMinutes: 15, inspectDays: 1, jailDays: 3, bailAmount: 5000, jailProblems: 20};
+  pick3Price: 200, pick3Max: 12, pick3Share: 40, pick3Seed: 5000, pick3Match2: 400, pick3Match1: 100, pick3Boost: 1000, scratchPrice: 100, auditChance: 15, auditFine: 300, auditDays: 1, scratchLimit: 5, marketChance: 10, bizLimit: 2, auditPass: 3, wholesalePct: 50, homeGrace: 1, profitShare: 20, dividendEvery: 7, needsCount: 3, needsBonus: 300, needsPenalty: 100, stampReward: 200, farmDiscount: 20, autoMinutes: 15, inspectDays: 1, jailDays: 3, bailAmount: 5000, jailProblems: 20, fraudLimit: 8, fraudFine: 10000, fraudChance: 50, fraudBail: 50000, fraudBanAfter: 3, fraudBanDays: 30};
 const DEFAULT_UTIL = [{name: 'Electric', amount: 800}, {name: 'Water', amount: 500}, {name: 'Internet', amount: 600}];
 const DEFAULT_HOMES = [{name: 'Apartment', rent: 1000, price: 15000}, {name: 'Townhouse', rent: 1600, price: 25000}, {name: 'House with a yard', rent: 2400, price: 40000}];
 const SHARES = 20;
@@ -447,17 +447,66 @@ function restrictText(pid) {
 }
 const jailDeadline = p => (p.homelessSince ?? today()) + Math.max(1, Math.round(cfg('jailDays'))) - 1;
 function jailProblem(pid) { const [q, raw] = makeProblem(levelFor(pid, 350)); return {q, a: Math.round(raw * 100) / 100}; }
-async function sendToJail(p, day, patch) {
-  const stay = Number(p.jailCount || 0) + 1, pr = jailProblem(p.id);
-  const needed = Math.max(1, Math.round(cfg('jailProblems'))) + 10 * (Math.min(stay, 3) - 1), bail = cfg('bailAmount') * Math.min(stay, 3);
-  await db.doc('players/' + p.id).update({jail: {since: day, solved: 0, needed, wrong: 0, bail, stay, q: pr.q, a: pr.a}, jailCount: stay});
-  await sendMsg('bank', p.id, `You went ${Math.round(cfg('jailDays'))} days without a home, so you’re in the Town Jail${stay > 1 ? ` (stay #${stay})` : ''}. Pay ${money(bail)} bail or finish ${needed} work release problems to get out. While you’re in jail you get no paychecks and your businesses are closed. When you get out: ${consequenceFor(stay).text}`, day);
-  const item = {day, title: `${p.name} goes to jail`, text: `${p.name} went ${Math.round(cfg('jailDays'))} days without a home and was taken to the Town Jail${stay > 1 ? `. That’s jail stay number ${stay}` : ''}.`};
+const JAIL_WHY = {home: d => `went ${d} days without a home`, fraud: () => 'got caught committing lottery fraud'};
+async function sendToJail(p, day, patch, reason = 'home') {
+  const stay = Number(p.jailCount || 0) + 1, pr = jailProblem(p.id), why = (JAIL_WHY[reason] || JAIL_WHY.home)(Math.round(cfg('jailDays')));
+  const needed = Math.max(1, Math.round(cfg('jailProblems'))) + 10 * (Math.min(stay, 3) - 1);
+  const bail = reason === 'fraud' ? cfg('fraudBail') : cfg('bailAmount') * Math.min(stay, 3);
+  await db.doc('players/' + p.id).update({jail: {since: day, solved: 0, needed, wrong: 0, bail, stay, reason, q: pr.q, a: pr.a}, jailCount: stay});
+  await sendMsg('bank', p.id, `You ${why}, so you’re in the Town Jail${stay > 1 ? ` (stay #${stay})` : ''}. Pay ${money(bail)} bail or finish ${needed} work release problems to get out. While you’re in jail you get no paychecks and your businesses are closed. When you get out: ${consequenceFor(stay).text}`, day);
+  const item = {day, title: reason === 'fraud' ? `${p.name} jailed for lottery fraud` : `${p.name} goes to jail`, text: `${p.name} ${why} and was taken to the Town Jail${stay > 1 ? `. That’s jail stay number ${stay}` : ''}.`};
   if (patch) patch.news = [item, ...(patch.news || S.settings.news || [])].slice(0, 12);
+  else await db.doc('town/settings').update({news: [item, ...(S.settings.news || [])].slice(0, 12)});
+}
+// Lottery fraud: trying to buy more than the daily limit opens an investigation.
+const lottoToday = pid => S.lottoTickets.filter(t => t.playerId === pid && t.day === today()).length;
+const fraudOf = pid => S.players[pid]?.fraud;
+const fraudPending = pid => fraudOf(pid)?.status === 'pending';
+async function lottoGate(pid) {
+  if (fraudPending(pid)) fail('The Lottery Office is investigating you. Choose what to do on the Lottery tab first.');
+  if (fraudOf(pid)?.day === today()) fail('The Lottery Office closed your lottery account for the rest of today.');
+  if (lottoToday(pid) >= Math.round(cfg('fraudLimit'))) {
+    await db.doc('players/' + pid).update({fraud: {day: today(), status: 'pending'}});
+    await sendMsg('bank', pid, `The Lottery Office is investigating you for lottery fraud: you tried to buy more than ${Math.round(cfg('fraudLimit'))} tickets in one day. Pay a ${money(cfg('fraudFine'))} fine, or try to get away with it (${Math.round(cfg('fraudChance'))}% chance you go to jail). Decide on the Lottery tab.`);
+    fail(`Stop! You tried to buy more than ${Math.round(cfg('fraudLimit'))} lottery tickets today. The Lottery Office is investigating you.`);
+  }
+}
+// Every guilty finding (fined or jailed) counts. More than 3 brings a long lottery ban.
+async function fraudGuilty(pid) {
+  const n = Number(S.players[pid]?.fraudGuilty || 0) + 1, upd = {fraudGuilty: n}, after = Math.round(cfg('fraudBanAfter')), days = Math.round(cfg('fraudBanDays'));
+  if (n > after) {
+    const until = today() + days, cur = restr(pid);
+    upd.restrict = {...cur, lotteryUntil: Math.max(cur.lotteryUntil || 0, until)};
+    await sendMsg('bank', pid, `That’s ${n} lottery fraud convictions. You’re banned from the lottery for ${days} days, through Day ${until}.`);
+    await db.doc('town/settings').update({news: [{day: today(), title: `${nameOf(pid)} banned from the lottery`, text: `After ${n} lottery fraud convictions, ${nameOf(pid)} is banned from buying lottery tickets for ${days} days.`}, ...(S.settings.news || [])].slice(0, 12)});
+  }
+  await db.doc('players/' + pid).update(upd);
+  return n;
+}
+async function fraudFine(pid, auto) {
+  await fraudGuilty(pid);
+  await addBill(pid, 'fine', 'Lottery fraud fine', [{name: 'Lottery fraud' + (auto ? ' (no response)' : ''), amount: cfg('fraudFine')}], today());
+  await db.doc('players/' + pid).update({fraud: {...fraudOf(pid), status: 'fined'}});
+  await sendMsg('bank', pid, `${auto ? 'You didn’t respond to the Lottery Office, so you’ve been fined.' : 'You chose to pay the fine.'} The ${money(cfg('fraudFine'))} lottery fraud fine is in your Bills tab.`);
+  await db.doc('town/settings').update({news: [{day: today(), title: 'Lottery fraud fine', text: `A resident was fined ${money(cfg('fraudFine'))} for trying to buy too many lottery tickets. We won’t say who.`}, ...(S.settings.news || [])].slice(0, 12)});
+}
+async function doFraud(day) {
+  let n = 0;
+  for (const p of playerList().filter(p => p.fraud?.status === 'pending' && p.fraud.day < day)) { await fraudFine(p.id, true); n++; }
+  return n ? `${n} lottery fraud fine${n > 1 ? 's' : ''}` : '';
+}
+function fraudPanel(pid) {
+  if (!fraudPending(pid)) return '';
+  return `<section class="panel" style="border:2px solid var(--bad)"><p class="eyebrow">Lottery Office</p><h2>You’re under investigation</h2>
+    <p>You tried to buy more than ${Math.round(cfg('fraudLimit'))} lottery tickets in one day. That looks like lottery fraud. What will you do?</p>
+    <div class="row"><button class="btn gold" data-act="fraudPay">Pay the ${money(cfg('fraudFine'))} fine</button><button class="btn danger" data-act="fraudRisk">Try to get away with it</button></div>
+    <p class="muted" style="font-size:.88rem">Get away with it and you pay nothing. But there’s a ${Math.round(cfg('fraudChance'))}% chance you get caught and go to jail (bail ${money(cfg('fraudBail'))}). If you don’t decide by tomorrow, you’ll be fined.</p>
+    <p class="${Number(S.players[pid]?.fraudGuilty || 0) ? 'neg' : 'muted'}" style="font-size:.88rem">Lottery fraud convictions so far: <b>${Number(S.players[pid]?.fraudGuilty || 0)}</b>. Getting fined or jailed counts. More than ${Math.round(cfg('fraudBanAfter'))} and you’re banned from the lottery for ${Math.round(cfg('fraudBanDays'))} days.</p></section>`;
 }
 async function releaseFromJail(pid, how) {
   const p = S.players[pid], stay = Number(p?.jailCount || 1), c = consequenceFor(stay), cur = restr(pid);
-  const r = {...cur, ...c.r, lotteryBan: !!(cur.lotteryBan || c.r.lotteryBan)};
+  const r = {...cur, lotteryBan: !!(cur.lotteryBan || c.r.lotteryBan)};
+  for (const k of ['lotteryUntil', 'loansUntil', 'bizUntil', 'stocksUntil']) if (c.r[k] != null) r[k] = Math.max(cur[k] || 0, c.r[k]);
   await db.doc('players/' + pid).update({jail: null, homelessSince: p?.home ? null : today(), restrict: r});
   // Inspections and audits were paused in jail; give them fresh deadlines now.
   if (auditPending(pid)) await db.doc('players/' + pid).update({audit: {...auditOf(pid), dueDay: today() + Math.max(0, Math.round(cfg('auditDays')))}});
@@ -480,7 +529,7 @@ async function doJail(day, patch) {
 function jailView() {
   const pid = S.me, j = S.players[pid].jail, b = balances(), have = bal(b, pid, 'c') + Math.max(0, bal(b, pid, 's')), bail = j.bail ?? cfg('bailAmount'), left = Math.max(0, j.needed - j.solved);
   return `<section class="panel" style="border:2px solid var(--bad)"><p class="eyebrow">Town Jail · since Day ${j.since}</p><h2>You’re in jail</h2>
-      <p>You went ${Math.round(cfg('jailDays'))} days without a home. While you’re here you get <b>no paychecks</b>, your <b>businesses are closed</b>, and your <b>bills keep coming</b>. Inspections and tax audits are paused until you’re out.</p>
+      <p>You ${(JAIL_WHY[j.reason] || JAIL_WHY.home)(Math.round(cfg('jailDays')))}. While you’re here you get <b>no paychecks</b>, your <b>businesses are closed</b>, and your <b>bills keep coming</b>. Inspections and tax audits are paused until you’re out.</p>
       <p class="neg"><b>${j.stay > 1 ? `This is jail stay #${j.stay}. ` : ''}When you get out:</b> ${consequenceFor(j.stay || jailStays(pid) || 1).text} Every jail stay also costs 40 credit points.</p></section>
     <div class="cols even"><div class="stack">
       <section class="panel"><h3>Way out 1: Pay bail</h3><p>Bail is <b class="num">${money(bail)}</b>. It comes out of checking first, then savings. You have <b class="num">${money(have)}</b>.</p>
@@ -982,6 +1031,7 @@ async function doLicenses(day) {
 async function advanceDay() {
   const d = today() + 1, patch = {}, done = [];
   { const r = await doNeeds(d); if (r) done.push(r); }
+  { const r = await doFraud(d); if (r) done.push(r); }
   { const r = await doJail(d, patch); if (r) done.push(r); }
   const late = await markLate(d); if (late) done.push(late);
   const cd = await doCds(d); if (cd) done.push(cd);
@@ -1347,7 +1397,7 @@ function shell(isBank) {
   const tabs = isBank
     ? [['town','Town'],['paper','Gazette'],['calendar','Day & schedule'],['teller','Teller window', bankQueue],['jobs','Odd jobs', S.gigs.filter(g => g.status === 'review' && g.kind !== 'request').length],...(Object.values(S.shops).some(x => x.ownerId === 'bank') ? [['hotel','Bank businesses', S.orders.filter(o => o.sellerId === 'bank' && o.status === 'new').length]] : []),['inspector','Inspector', Object.values(S.shops).filter(sh => sh.ownerId !== 'bank').filter(sh => sh.renewalRequested || inspOverdue(sh) || sh.inspection?.nextDue === today()).length],['messages','Messages', unreadTotal()],['people','Residents'],['shops','Businesses'],['settings','Settings']]
     : inJail(S.me) ? [['jail','Town jail']] : [['home','Accounts'],['paper','Gazette'],['messages','Messages', unreadTotal()],['bills','Bills', openBills(S.me).length],['jobs','Odd jobs', activeGigs(S.me).filter(g => g.status === 'claimed').length + S.gigs.filter(g => g.kind === 'request' && g.postedBy === S.me && g.status === 'review').length],['housing','Housing'],['pay','Write a check'],['shop','Main Street'],...(Object.values(S.shops).some(sh => sh.ownerId === S.me && sh.quiz && (quizPending(sh) || sh.quiz.doneDay === today())) ? [['inspect','Inspection', Object.values(S.shops).filter(sh => sh.ownerId === S.me && quizPending(sh)).length]] : []),
-      ...(auditPending(S.me) ? [['audit','Tax audit', 1]] : auditOf(S.me)?.doneDay === today() ? [['audit','Tax audit']] : []),['myshop','My businesses', (bizCount(S.me) > bizLimit() ? 1 : 0) + Object.values(S.shops).filter(sh => sh.ownerId === S.me).reduce((a, sh) => a + lowStock(sh).filter(i => i.stock === 0).length, 0) + myOrders + Object.values(S.shops).filter(sh => sh.ownerId === S.me && ['Today', 'Overdue'].includes(inspNotice(sh)?.short)).length],['stocks','Stocks'],['lottery','Lottery', ((() => { const l = (S.settings.lotteryHistory || [])[0]; return l && l.numbers && l.drawNo > Number(ls('ptb.lotto.seen.' + S.me) || 0) && S.lottoTickets.some(t => t.drawNo === l.drawNo && t.playerId === S.me) ? 1 : 0; })()) + S.lottoTickets.filter(t => t.kind === 'scratch' && t.playerId === S.me && !t.done).length],['bank','Bank & credit', myWaiting]];
+      ...(auditPending(S.me) ? [['audit','Tax audit', 1]] : auditOf(S.me)?.doneDay === today() ? [['audit','Tax audit']] : []),['myshop','My businesses', (bizCount(S.me) > bizLimit() ? 1 : 0) + Object.values(S.shops).filter(sh => sh.ownerId === S.me).reduce((a, sh) => a + lowStock(sh).filter(i => i.stock === 0).length, 0) + myOrders + Object.values(S.shops).filter(sh => sh.ownerId === S.me && ['Today', 'Overdue'].includes(inspNotice(sh)?.short)).length],['stocks','Stocks'],['lottery','Lottery', ((() => { const l = (S.settings.lotteryHistory || [])[0]; return l && l.numbers && l.drawNo > Number(ls('ptb.lotto.seen.' + S.me) || 0) && S.lottoTickets.some(t => t.drawNo === l.drawNo && t.playerId === S.me) ? 1 : 0; })()) + S.lottoTickets.filter(t => t.kind === 'scratch' && t.playerId === S.me && !t.done).length + (fraudPending(S.me) ? 1 : 0)],['bank','Bank & credit', myWaiting]];
   if (!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
   const who = isBank ? 'Banker mode' : nameOf(S.me) + (S.players[S.me]?.job ? ' · ' + S.players[S.me].job : '');
   const content = isBank ? bankView() : playerView();
@@ -1391,6 +1441,7 @@ function playerView() {
     ${auditPending(pid) ? `<div class="alert bad"><span><b>Surprise tax audit!</b> Answer ${AUDIT_N} problems by the end of ${auditOf(pid).dueDay === today() ? 'today' : 'Day ' + auditOf(pid).dueDay}.</span><button class="btn sm" data-act="tab" data-id="audit">Start audit</button></div>` : ''}
     ${Object.values(S.shops).filter(sh => sh.ownerId === pid && ['Today', 'Tomorrow', 'Overdue'].includes(inspNotice(sh)?.short)).map(sh => { const n = inspNotice(sh); return `<div class="alert ${n.cls === 'bad' ? 'bad' : ''}"><span><b>${esc(sh.name)}:</b> ${esc(n.text)}</span><button class="btn sm" data-act="tab" data-id="myshop">Open</button></div>`; }).join('')}
     ${bizCount(pid) > bizLimit() ? `<div class="alert bad"><span><b>Too many businesses.</b> The limit is ${bizLimit()}. Choose which to close.</span><button class="btn sm" data-act="tab" data-id="myshop">Choose</button></div>` : ''}
+    ${fraudPending(pid) ? `<div class="alert bad"><span><b>The Lottery Office is investigating you!</b> Decide what to do before tomorrow.</span><button class="btn sm" data-act="tab" data-id="lottery">Decide</button></div>` : ''}
     ${restrictText(pid).length ? `<div class="alert"><span><b>Jail record (${jailStays(pid)} stay${jailStays(pid) === 1 ? '' : 's'}):</b> ${restrictText(pid).join(', ')}.</span></div>` : ''}
     ${!p.home ? `<div class="alert bad"><span><b>No home!</b> Find one by the end of ${jailDeadline(p) <= today() ? 'today' : 'Day ' + jailDeadline(p)} or you’ll go to the Town Jail.</span><button class="btn sm" data-act="tab" data-id="housing">Find a home</button></div>` : ''}
     ${(() => { const needs = needsFor(pid, today()); if (!needs.length) return ''; const met = needs.filter(k => needMet(pid, today(), k)).length;
@@ -1660,6 +1711,8 @@ function lotteryView() {
         ${revealing >= 3 ? `<p>${jw.length ? `<b>Jackpot won by ${esc([...new Set(jw.map(nameOf))].join(' & '))}: ${money(last.prize)}!</b>` : 'No jackpot winner. It rolled over and grew.'}</p>
         ${myLast.length ? `<div class="list">${myLast.map(t => { const m = matchCount(t.numbers, drawn), pz = prizeFor(m); return `<div class="li"><div class="balls">${t.numbers.map(n => `<span class="ball sm ${drawn.includes(n) ? 'hit' : 'miss'}">${n}</span>`).join('')}</div><div class="main"><b>${m === 3 ? 'JACKPOT!' : m ? 'Matched ' + m : 'No match'}</b></div><span class="amt ${pz ? 'pos' : 'muted'}">${pz ? money(pz, true) : '—'}</span></div>`; }).join('')}</div>` : '<p class="muted">You didn’t have a ticket in that drawing.</p>'}` : ''}</section>`;
   return `<div class="cols"><div class="stack">
+    ${fraudPanel(pid)}
+    ${!fraudPending(pid) && fraudOf(pid)?.day === today() ? '<div class="alert bad"><span><b>The Lottery Office closed your lottery account for the rest of today.</b></span></div>' : ''}
     ${noLottery(pid) ? `<div class="alert bad"><span><b>No lottery for you right now.</b> ${restr(pid).lotteryBan ? 'Your jail record got you banned until the banker clears it.' : `Your jail record blocks tickets and scratch-offs through Day ${restr(pid).lotteryUntil}.`}</span></div>` : ''}
     <section class="panel lotto"><p class="eyebrow">${esc(S.settings.name)} Pick 3 Lottery · Drawing #${L.drawNo}</p><div class="bigday num">${money(lottoPot())}</div>
       <p>Jackpot · drawing ${dayIn(nextOn('lotteryEvery'))} · ${all.length} ticket${all.length === 1 ? '' : 's'} sold · grows ${money(cfg('pick3Boost'))} extra if nobody wins</p></section>
@@ -1949,9 +2002,9 @@ function bankView() {
           <label>Amount<input id="ad-amt" inputmode="decimal" required placeholder="0.00"></label></div>
           <label>Reason<input id="ad-memo" maxlength="60" placeholder="Great job cleaning your room"></label>
           <div><button class="btn">Record it</button></div></form></section>
-      ${(() => { const jailed = ps.filter(p => p.jail), soon = ps.filter(p => !p.home && !p.jail), records = ps.filter(p => !p.jail && Number(p.jailCount || 0) > 0); return jailed.length || soon.length || records.length ? `<section class="panel"><h3>Town jail</h3>
-        ${jailed.length ? `<div class="list">${jailed.map(p => `<div class="li"><div class="main"><b>${esc(p.name)}</b><small>In since Day ${p.jail.since}${p.jail.stay > 1 ? ' · stay #' + p.jail.stay : ''} · work release ${p.jail.solved} of ${p.jail.needed} · bail ${money(p.jail.bail ?? cfg('bailAmount'))}</small></div><button class="btn ghost sm" data-act="jailRelease" data-id="${p.id}">Release</button></div>`).join('')}</div>` : '<p class="muted">Nobody is in jail.</p>'}
-        ${records.length ? `<div class="list">${records.map(p => `<div class="li"><div class="main"><b>${esc(p.name)} · ${p.jailCount} jail stay${p.jailCount === 1 ? '' : 's'}</b><small>${esc(restrictText(p.id).join(', ') || 'No active restrictions')}</small></div><button class="btn ghost sm" data-act="clearRecord" data-id="${p.id}">Clear record</button></div>`).join('')}</div>` : ''}
+      ${(() => { const jailed = ps.filter(p => p.jail), soon = ps.filter(p => !p.home && !p.jail), records = ps.filter(p => !p.jail && (Number(p.jailCount || 0) > 0 || Number(p.fraudGuilty || 0) > 0)); return jailed.length || soon.length || records.length ? `<section class="panel"><h3>Town jail</h3>
+        ${jailed.length ? `<div class="list">${jailed.map(p => `<div class="li"><div class="main"><b>${esc(p.name)}</b><small>${p.jail.reason === 'fraud' ? 'Lottery fraud' : 'No home'} · in since Day ${p.jail.since}${p.jail.stay > 1 ? ' · stay #' + p.jail.stay : ''} · work release ${p.jail.solved} of ${p.jail.needed} · bail ${money(p.jail.bail ?? cfg('bailAmount'))}</small></div><button class="btn ghost sm" data-act="jailRelease" data-id="${p.id}">Release</button></div>`).join('')}</div>` : '<p class="muted">Nobody is in jail.</p>'}
+        ${records.length ? `<div class="list">${records.map(p => `<div class="li"><div class="main"><b>${esc(p.name)} · ${Number(p.jailCount || 0)} jail stay${Number(p.jailCount || 0) === 1 ? '' : 's'}${Number(p.fraudGuilty || 0) ? ' · ' + p.fraudGuilty + ' lottery fraud' : ''}</b><small>${esc(restrictText(p.id).join(', ') || 'No active restrictions')}</small></div><button class="btn ghost sm" data-act="clearRecord" data-id="${p.id}">Clear record</button></div>`).join('')}</div>` : ''}
         ${soon.length ? `<p class="muted" style="font-size:.85rem">No home yet: ${soon.map(p => `${esc(p.name)} (jail after Day ${jailDeadline(p)})`).join(', ')}</p>` : ''}</section>` : ''; })()}
       <section class="panel"><h3>Send a bill</h3><p class="muted" style="font-size:.88rem">Life has surprise costs. Bills go to the Bills tab with a due date, and the resident gets a message.</p>
         <div class="row"><button class="btn gold sm" data-act="surprise" data-id="one">Surprise bill to a random resident</button><button class="btn ghost sm" data-act="surprise" data-id="all">Surprise bill to everyone</button></div>
@@ -2126,6 +2179,12 @@ function bankView() {
         <label>Prize for matching 2<input id="st-lm2" inputmode="decimal" value="${c2(cfg('pick3Match2'))}"></label>
         <label>Prize for matching 1<input id="st-lm1" inputmode="decimal" value="${c2(cfg('pick3Match1'))}"></label>
         <label>Scratch-off price<input id="st-scr" inputmode="decimal" value="${c2(cfg('scratchPrice'))}"></label>
+        <label>Lottery tickets per day before a fraud investigation<input id="st-frl" type="number" min="1" value="${Math.round(cfg('fraudLimit'))}"></label>
+        <label>Lottery fraud fine<input id="st-frf" inputmode="decimal" value="${(cfg('fraudFine') / 100).toFixed(2)}"></label>
+        <label>Chance of jail if they risk it (%)<input id="st-frc" type="number" min="0" max="100" value="${Math.round(cfg('fraudChance'))}"></label>
+        <label>Lottery fraud convictions before a long ban<input id="st-frn" type="number" min="1" value="${Math.round(cfg('fraudBanAfter'))}"></label>
+        <label>Length of the lottery ban (days)<input id="st-frd" type="number" min="1" value="${Math.round(cfg('fraudBanDays'))}"></label>
+        <label>Lottery fraud bail<input id="st-frb" inputmode="decimal" value="${(cfg('fraudBail') / 100).toFixed(2)}"></label>
         <label>Scratch-offs per person per day (0 = no limit)<input id="st-scrl" type="number" min="0" value="${Math.round(cfg('scratchLimit'))}"></label>
         <label>New town jobs each day<input id="st-gigs" type="number" min="0" max="16" value="${Math.round(cfg('gigsPerDay'))}"></label></div></section>
       <section class="panel"><h3>Business rules</h3>
@@ -2258,6 +2317,20 @@ const acts = {
   },
   recDel: key => { const i = key.lastIndexOf(':'), fk = key.slice(0, i), idx = Number(key.slice(i + 1)); syncDraft(fk); clear(...draftIds(fk)); (S.recipeDraft[fk] || []).splice(idx, 1); render(); },
   recEdit: id => { if (S.editRecipe) { clear(...draftIds('it-' + S.editRecipe)); delete S.recipeDraft['it-' + S.editRecipe]; } S.editRecipe = id || null; render(); },
+  fraudPay: () => run(async () => { if (!fraudPending(S.me)) fail('There’s no investigation open.'); await fraudFine(S.me, false); toast('Fine accepted. Pay it in your Bills tab.'); }),
+  fraudRisk: () => {
+    if (!fraudPending(S.me)) return;
+    confirmIt('Try to get away with it?', `It’s a ${Math.round(cfg('fraudChance'))}% chance you get caught and go to jail, where bail is ${money(cfg('fraudBail'))}. Feeling lucky?`, 'Risk it', async () => {
+      if (!fraudPending(S.me)) fail('There’s no investigation open.');
+      if (Math.random() * 100 < cfg('fraudChance')) {
+        await db.doc('players/' + S.me).update({fraud: {...fraudOf(S.me), status: 'jailed'}});
+        await sendToJail(S.players[S.me], today(), null, 'fraud'); await fraudGuilty(S.me); toast('CAUGHT! You’re going to jail.', true);
+      } else {
+        await db.doc('players/' + S.me).update({fraud: {...fraudOf(S.me), status: 'escaped'}});
+        await sendMsg('bank', S.me, 'The Lottery Office couldn’t prove anything. You got away with it… this time. No more lottery today.'); toast('You got away with it… this time.');
+      }
+    }, true);
+  },
   payBail: () => run(async () => {
     const p = S.players[S.me]; if (!p?.jail) fail('You’re not in jail.');
     const bail = p.jail.bail ?? cfg('bailAmount'), b = balances(), c = Math.max(0, bal(b, S.me, 'c')), sv = Math.max(0, bal(b, S.me, 's'));
@@ -2267,7 +2340,7 @@ const acts = {
     if (fromS > 0) await addTx(S.me + '.s', 'bank', fromS, 'adjust', 'Paid bail to get out of jail (from savings)');
     await releaseFromJail(S.me, 'bail paid'); S.tab = 'housing'; toast('You’re free! Go find a home.');
   }),
-  clearRecord: pid => confirmIt(`Clear ${nameOf(pid)}’s jail record?`, 'Their jail stays reset to zero, their credit points come back, and all lottery, loan, business and stock restrictions are lifted.', 'Clear record', async () => { await db.doc('players/' + pid).update({jailCount: 0, restrict: null}); await sendMsg('bank', pid, 'The banker cleared your jail record. Fresh start!'); toast('Record cleared'); }),
+  clearRecord: pid => confirmIt(`Clear ${nameOf(pid)}’s jail record?`, 'Their jail stays and lottery fraud convictions reset to zero, their credit points come back, and all lottery, loan, business and stock restrictions are lifted.', 'Clear record', async () => { await db.doc('players/' + pid).update({jailCount: 0, fraudGuilty: 0, restrict: null}); await sendMsg('bank', pid, 'The banker cleared your jail record. Fresh start!'); toast('Record cleared'); }),
   jailRelease: pid => confirmIt(`Release ${nameOf(pid)} from jail?`, 'They get out free and their 3-day home clock starts over.', 'Release', async () => { await releaseFromJail(pid, 'released by the banker'); toast(`${nameOf(pid)} released`); }),
   quizAnswer: key => run(async () => {
     const [sid, i] = key.split(':'), sh = S.shops[sid]; if (!sh || !quizPending(sh) || sh.ownerId !== S.me) fail('That inspection is over.');
@@ -2288,6 +2361,7 @@ const acts = {
   quickPick: () => { const max = Math.max(4, every('pick3Max')); S.picks = Array.from({length: max}, (_, i) => i + 1).sort(() => Math.random() - .5).slice(0, 3).sort((a, b) => a - b); render(); },
   buyLotto: () => run(async () => {
     if (noLottery(S.me)) fail(restr(S.me).lotteryBan ? 'You’re banned from the lottery because of your jail record.' : `No lottery until after Day ${restr(S.me).lotteryUntil} because of your jail record.`);
+    await lottoGate(S.me);
     const nums = (S.picks || []).slice(); if (nums.length !== 3) fail('Pick 3 numbers first.');
     const price = cfg('pick3Price'); if (bal(balances(), S.me, 'c') < price) fail(`A ticket costs ${money(price)}. Not enough in checking.`);
     const drawNo = lotto().drawNo;
@@ -2297,6 +2371,7 @@ const acts = {
   }),
   buyScratch: () => run(async () => {
     if (noLottery(S.me)) fail('Your jail record means no lottery or scratch-offs right now.');
+    await lottoGate(S.me);
     const lim = Math.round(cfg('scratchLimit')); if (lim > 0 && scratchesToday(S.me) >= lim) fail(`That’s ${lim} scratch-offs today, the daily limit. Come back tomorrow!`);
     const price = cfg('scratchPrice'); if (bal(balances(), S.me, 'c') < price) fail(`A scratch-off costs ${money(price)}. Not enough in checking.`);
     const o = scratchDraw();
@@ -2873,9 +2948,9 @@ const forms = {
       payEvery: ints('st-payev', 1), billEvery: ints('st-billev', 1), rentEvery: ints('st-rentev', 1), billGrace: ints('st-grace', 0), interestEvery: ints('st-intev', 1),
       taxRate: n('st-tax'), savingsRate: n('st-sav'), loanRate: n('st-loan'), lateFee: c('st-late'), cdRate: n('st-cdr'), cdDays: ints('st-cdd', 1), cdPenalty: Math.min(100, n('st-cdp')),
       mortgageRate: n('st-mr'), jailDays: ints('st-jd', 1), bailAmount: c('st-bail'), jailProblems: Math.min(100, ints('st-jp', 1)), mortgageTerm: ints('st-mt', 1), downPct: Math.min(100, n('st-dp')), utilities, homes: homesList,
-      pick3Price: c('st-lp'), lotteryEvery: ints('st-le', 1), pick3Max: Math.min(40, ints('st-lm', 4)), pick3Share: Math.min(100, n('st-ls')), pick3Seed: c('st-lseed'), pick3Boost: c('st-lboost'), pick3Match2: c('st-lm2'), pick3Match1: c('st-lm1'), scratchPrice: c('st-scr'), scratchLimit: ints('st-scrl', 0), gigsPerDay: Math.min(16, ints('st-gigs', 0)), bizCosts: Object.fromEntries(Object.keys(BIZ).map(t => [t, c('bc-' + t)])), bizRules: Object.fromEntries(Object.keys(BIZ).map(t => [t, {inspect: ints('br-i-' + t, 1), license: ints('br-l-' + t, 1)}])), renewPct: Math.min(200, n('st-renew')), bizLimit: Math.min(8, ints('st-bizlim', 1)), inspectDays: ints('st-insd', 0), wholesalePct: Math.min(100, n('st-whole')), stockSwing: Math.min(50, n('st-swing')), marketChance: Math.min(100, n('st-mkt')), profitShare: Math.min(100, n('st-psh')), needsCount: Math.min(4, ints('st-ndn', 0)), needsBonus: c('st-ndb'), needsPenalty: c('st-ndp'), stampReward: c('st-stmp'), farmDiscount: Math.min(90, n('st-farm')), dividendEvery: ints('st-pse', 1),
+      pick3Price: c('st-lp'), lotteryEvery: ints('st-le', 1), pick3Max: Math.min(40, ints('st-lm', 4)), pick3Share: Math.min(100, n('st-ls')), pick3Seed: c('st-lseed'), pick3Boost: c('st-lboost'), pick3Match2: c('st-lm2'), pick3Match1: c('st-lm1'), scratchPrice: c('st-scr'), scratchLimit: ints('st-scrl', 0), fraudLimit: ints('st-frl', 1), fraudFine: c('st-frf'), fraudChance: Math.min(100, n('st-frc')), fraudBail: c('st-frb'), fraudBanAfter: ints('st-frn', 1), fraudBanDays: ints('st-frd', 1), gigsPerDay: Math.min(16, ints('st-gigs', 0)), bizCosts: Object.fromEntries(Object.keys(BIZ).map(t => [t, c('bc-' + t)])), bizRules: Object.fromEntries(Object.keys(BIZ).map(t => [t, {inspect: ints('br-i-' + t, 1), license: ints('br-l-' + t, 1)}])), renewPct: Math.min(200, n('st-renew')), bizLimit: Math.min(8, ints('st-bizlim', 1)), inspectDays: ints('st-insd', 0), wholesalePct: Math.min(100, n('st-whole')), stockSwing: Math.min(50, n('st-swing')), marketChance: Math.min(100, n('st-mkt')), profitShare: Math.min(100, n('st-psh')), needsCount: Math.min(4, ints('st-ndn', 0)), needsBonus: c('st-ndb'), needsPenalty: c('st-ndp'), stampReward: c('st-stmp'), farmDiscount: Math.min(90, n('st-farm')), dividendEvery: ints('st-pse', 1),
     });
-    const all = ['st-name','st-sym','st-pin','st-day','st-ev','st-surp','st-aud','st-audf','st-audd','st-audp','st-payev','st-billev','st-rentev','st-grace','st-intev','st-tax','st-sav','st-loan','st-late','st-cdr','st-cdd','st-cdp','st-mr','st-mt','st-dp','st-jd','st-bail','st-jp','st-lp','st-le','st-lm','st-ls','st-lseed','st-lboost','st-lm2','st-lm1','st-scr','st-scrl','st-gigs','st-swing','st-mkt','st-psh','st-pse','st-ndn','st-ndb','st-ndp','st-stmp','st-farm'];
+    const all = ['st-name','st-sym','st-pin','st-day','st-ev','st-surp','st-aud','st-audf','st-audd','st-audp','st-payev','st-billev','st-rentev','st-grace','st-intev','st-tax','st-sav','st-loan','st-late','st-cdr','st-cdd','st-cdp','st-mr','st-mt','st-dp','st-jd','st-bail','st-jp','st-lp','st-le','st-lm','st-ls','st-lseed','st-lboost','st-lm2','st-lm1','st-scr','st-scrl','st-frl','st-frf','st-frc','st-frb','st-frn','st-frd','st-gigs','st-swing','st-mkt','st-psh','st-pse','st-ndn','st-ndb','st-ndp','st-stmp','st-farm'];
     Object.keys(BIZ).forEach(t => all.push('bc-' + t, 'br-i-' + t, 'br-l-' + t)); all.push('st-renew', 'st-bizlim', 'st-whole', 'st-insd');
     for (let i = 0; i < 4; i++) all.push('ut-n-' + i, 'ut-a-' + i, 'hm-n-' + i, 'hm-r-' + i, 'hm-p-' + i);
     clear(...all); toast('Settings saved');
