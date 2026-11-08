@@ -1812,7 +1812,11 @@ const acts = {
     const g = S.gigs.find(x => x.id === id), ref = db.doc('gigs/' + id);
     if (g?.postedBy === S.me) fail('That’s your own request.');
     const [q, raw] = g && g.kind === 'random' ? makeProblem(levelFor(S.me, g.pay)) : [null, null], a = raw == null ? null : Math.round(raw * 100) / 100;
-    await db.runTransaction(async t => { const d = await t.get(ref); if (!d.exists || d.data().status !== 'open') fail('Someone else took that job.'); if ((d.data().failedBy || []).includes(S.me)) fail('You already failed this job. Try a different one.'); t.update(ref, {status: 'claimed', claimedBy: S.me, q, a, tries: 0, note: null, claimedDay: today()}); });
+    // Save the claim directly (no server read), so jobs still work when the daily read allowance runs low.
+    if (!g || g.status !== 'open') fail('Someone else took that job.');
+    if ((g.failedBy || []).includes(S.me)) fail('You already failed this job. Try a different one.');
+    await ref.update({status: 'claimed', claimedBy: S.me, q, a, tries: 0, note: null, claimedDay: today()});
+    setTimeout(() => { const now = S.gigs.find(x => x.id === id); if (now && now.claimedBy && now.claimedBy !== S.me) toast('Someone else took that job a split second before you.', true); }, 2500);
     toast('Job taken. Get to work!');
   }),
   quitGig: id => {
@@ -2447,7 +2451,9 @@ app.addEventListener('submit', e => {
 (async () => {
   const timer = setTimeout(() => { S.slow = true; render(); }, 10000);
   try {
-    if (window.firebase && FIREBASE_CONFIG && FIREBASE_CONFIG.projectId) { firebase.initializeApp(FIREBASE_CONFIG); db = firebase.firestore(); }
+    if (window.firebase && FIREBASE_CONFIG && FIREBASE_CONFIG.projectId) { firebase.initializeApp(FIREBASE_CONFIG); db = firebase.firestore();
+      // Keep a copy of the town on this device so reopening the app doesn't re-download everything.
+      try { await db.enablePersistence({synchronizeTabs: true}); } catch (e) { console.warn('Offline cache unavailable', e && e.code); } }
   } catch (e) { console.error(e); db = null; }
   if (!db) { clearTimeout(timer); S.dbState = 'none'; render(); return; }
   S.dbState = 'ok';
