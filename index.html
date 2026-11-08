@@ -51,6 +51,8 @@ p{margin:0}
 .brand span{font-size:.8rem;color:var(--muted)}
 .tabs{display:flex;gap:4px;overflow-x:auto;padding-bottom:8px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1160px;margin:0 auto;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
+/* Desktops and wide screens: wrap tabs onto more rows instead of scrolling sideways (no swipe with a mouse). */
+@media (min-width:720px), (hover:hover) and (pointer:fine){.tabs{flex-wrap:wrap;overflow-x:visible;row-gap:4px}.tab{min-height:38px;padding:8px 12px}}
 .tab{flex:none;border:0;background:transparent;color:var(--muted);font:600 .95rem var(--f-body);padding:10px 14px;border-radius:999px;cursor:pointer;min-height:44px}
 .tab[aria-current="page"]{background:var(--note);color:var(--note-ink)}
 .tab .dot{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--coin);color:#1b1205;font-size:.75rem;line-height:20px;text-align:center}
