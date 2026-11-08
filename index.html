@@ -237,14 +237,14 @@ const DEFAULT_UTIL = [{name: 'Electric', amount: 800}, {name: 'Water', amount: 5
 const DEFAULT_HOMES = [{name: 'Apartment', rent: 1000, price: 15000}, {name: 'Townhouse', rent: 1600, price: 25000}, {name: 'House with a yard', rent: 2400, price: 40000}];
 const SHARES = 20;
 const BIZ = {
-  shop: {noun: 'shop', Noun: 'Shop', list: 'Price list', item: 'Item', buy: 'Buy', done: 'Delivered', waiting: 'Waiting for delivery', ph: 'Lemonade Stand', php: 'Fresh lemonade and cookies', iph: 'Cookie', restock: true, tips: false, awning: 'var(--note)', always: 'Always in stock', stockLbl: 'Stock', blurb: 'Sell things to the rest of town'},
-  restaurant: {noun: 'restaurant', Noun: 'Restaurant', list: 'Menu', item: 'Dish', buy: 'Order', done: 'Served', waiting: 'Waiting to be served', ph: 'The Hungry Moose Diner', php: 'Pancakes, burgers and milkshakes', iph: 'Cheeseburger', restock: true, tips: true, awning: 'var(--bad)', always: 'On the menu', stockLbl: 'Servings', blurb: 'Cook and serve meals; customers can tip'},
+  shop: {noun: 'shop', Noun: 'Shop', list: 'Price list', item: 'Item', buy: 'Buy', done: 'Delivered', waiting: 'Waiting for delivery', ph: 'Lemonade Stand', php: 'Fresh lemonade and cookies', iph: 'Cookie', cogs: true, tips: false, awning: 'var(--note)', always: 'Always in stock', stockLbl: 'Stock', blurb: 'Sell things to the rest of town'},
+  restaurant: {noun: 'restaurant', Noun: 'Restaurant', list: 'Menu', item: 'Dish', buy: 'Order', done: 'Served', waiting: 'Waiting to be served', ph: 'The Hungry Moose Diner', php: 'Pancakes, burgers and milkshakes', iph: 'Cheeseburger', cogs: true, tips: true, awning: 'var(--bad)', always: 'On the menu', stockLbl: 'Servings', blurb: 'Cook and serve meals; customers can tip'},
   service: {noun: 'service business', Noun: 'Service', list: 'Services', item: 'Service', buy: 'Book', done: 'Completed', waiting: 'Booked, waiting for service', ph: 'Sparkle Car Wash', php: 'Car washes, haircuts, tutoring', iph: 'Full car wash', tips: true, awning: '#3C7FB0', always: 'Open for booking', stockLbl: 'Time slots', blurb: 'Do jobs for people like haircuts or car washes; customers can tip'},
   entertainment: {noun: 'entertainment venue', Noun: 'Entertainment', list: 'Tickets', item: 'Ticket', buy: 'Get tickets', done: 'Admitted', waiting: 'Tickets ready to use', ph: 'Starlight Movie Theater', php: 'Movies, an arcade, or a mini zoo', iph: 'Movie ticket', tips: false, awning: '#9C4BB3', always: 'Plenty of seats', stockLbl: 'Seats', blurb: 'Sell tickets to movies, shows, games or rides'},
   doctor: {noun: 'doctor’s office', Noun: 'Doctor’s office', list: 'Treatments', item: 'Treatment', buy: 'Book visit', done: 'Treated', waiting: 'Waiting to see the doctor', ph: 'Main Street Clinic', php: 'Checkups, bandages and flu shots', iph: 'Checkup', tips: false, awning: '#C0612B', always: 'Open for visits', stockLbl: 'Appointments', blurb: 'Treat patients; residents’ doctor bills get paid to you'},
   repair: {noun: 'repair shop', Noun: 'Repair shop', list: 'Repairs', item: 'Repair', buy: 'Book repair', done: 'Fixed', waiting: 'Waiting for the repair', ph: 'Fix-It Garage', php: 'Bikes, cars, phones and windows', iph: 'Fix a flat tire', tips: true, awning: '#8A6D1F', always: 'Taking jobs', stockLbl: 'Time slots', blurb: 'Fix things; residents’ repair bills get paid to you'},
   hotel: {noun: 'hotel', Noun: 'Hotel', list: 'Rooms', item: 'Room type', buy: 'Book', done: 'Checked in', waiting: 'Room booked', ph: 'Grand Pine Hotel', php: 'Cozy rooms, a pool and free breakfast', iph: 'Standard room', tips: false, awning: '#2F7D6B', always: '', stockLbl: 'Number of rooms', blurb: 'Rent rooms by the night; tourists fill some rooms', hotel: true, bankOnly: true},
-  farm: {noun: 'farm stand', Noun: 'Farm stand', list: 'Produce', item: 'Produce', buy: 'Buy', done: 'Picked up', waiting: 'Ready for pickup', ph: 'Sunny Acres Farm', php: 'Fresh eggs, apples and flowers', iph: 'Dozen eggs', restock: true, tips: false, awning: '#6C8A2E', always: 'Plenty in the field', stockLbl: 'Amount', blurb: 'Grow and sell fresh food and flowers'},
+  farm: {noun: 'farm stand', Noun: 'Farm stand', list: 'Produce', item: 'Produce', buy: 'Buy', done: 'Picked up', waiting: 'Ready for pickup', ph: 'Sunny Acres Farm', php: 'Fresh eggs, apples and flowers', iph: 'Dozen eggs', cogs: true, tips: false, awning: '#6C8A2E', always: 'Plenty in the field', stockLbl: 'Amount', blurb: 'Grow and sell fresh food and flowers'},
 };
 const EVENTS = [
   {t: 'Town Fair', x: 'Everyone wins a {a} prize at the fair.', e: 'bonusAll', a: 500},
@@ -356,7 +356,8 @@ function inspNotice(sh) {
 }
 const bizLimit = () => Math.max(1, Math.round(cfg('bizLimit')));
 const bizCount = pid => Object.values(S.shops).filter(sh => sh.ownerId === pid).length;
-const needsStock = sh => !!BIZ[bizType(sh)]?.restock;
+const needsStock = sh => false; // manual restocking retired; costs are charged automatically per sale
+const hasCogs = sh => !!BIZ[bizType(sh)]?.cogs;
 const unitCost = item => Math.max(25, Math.round((item.price || 0) * cfg('wholesalePct') / 100));
 const supplySpend = shopId => S.tx.filter(t => t.kind === 'supply' && t.shopId === shopId).reduce((a, t) => a + t.amount, 0);
 const lowStock = sh => needsStock(sh) ? Object.values(S.items).filter(i => i.shopId === sh.id && i.stock != null && i.stock <= 2) : [];
@@ -713,7 +714,7 @@ function gauge(score, cls) {
     <text x="108" y="67" font-size="7" fill="var(--muted)" text-anchor="middle">850</text></svg>`;
 }
 
-const KIND = {pay:'Paycheck', check:'Check', move:'Savings transfer', purchase:'Purchase', meal:'Restaurant', refund:'Refund', loan:'Loan', repay:'Loan payment', interest:'Interest', adjust:'From the bank', bill:'Bill', lottery:'Lottery', job:'Odd job', biz:'Business', hotel:'Hotel', reverse:'Reversal', supply:'Supplies', dividend:'Profit share', needs:'Daily needs', stamps:'Stamp reward', escrow:'Request', rent:'Rent', home:'Home', stock:'Stocks', cash:'Cash', cd:'CD', event:'Town event'};
+const KIND = {pay:'Paycheck', check:'Check', move:'Savings transfer', purchase:'Purchase', meal:'Restaurant', refund:'Refund', loan:'Loan', repay:'Loan payment', interest:'Interest', adjust:'From the bank', bill:'Bill', lottery:'Lottery', job:'Odd job', biz:'Business', hotel:'Hotel', reverse:'Reversal', supply:'Cost of goods', dividend:'Profit share', needs:'Daily needs', stamps:'Stamp reward', escrow:'Request', rent:'Rent', home:'Home', stock:'Stocks', cash:'Cash', cd:'CD', event:'Town event'};
 function txRows(list, pid, limit = 15, canReverse = false) {
   const rows = list.slice(0, limit).map(t => {
     let delta = null; const title = t.memo || KIND[t.kind] || 'Transaction';
@@ -1500,7 +1501,7 @@ function manageBiz(shop) {
   const sid = shop.id, pct = salePct(shop);
   return `<div class="panel-head"><div><p class="eyebrow">${shop.ownerId === 'bank' ? 'Run by the town bank' : 'Your ' + T.noun}</p><h2>${esc(shop.name)}</h2></div><button class="btn danger sm" data-act="closeShop" data-id="${sid}">Close ${T.noun}</button></div>
     ${lowStock(shop).length ? `<div class="alert bad"><span><b>Running low:</b> ${lowStock(shop).map(i => `${esc(i.name)} (${i.stock === 0 ? 'sold out' : i.stock + ' left'})`).join(', ')}. Restock below.</span></div>` : ''}
-    <div class="stats"><div class="stat"><b>${money(sales)}</b><span>Total sales</span></div>${t === 'farm' ? `<div class="stat"><b>${money(S.tx.filter(x => x.kind === 'supply' && x.supplierShopId === sid).reduce((a, x) => a + x.amount, 0))}</b><span>Sold to restaurants</span></div>` : ''}${T.restock ? `<div class="stat"><b>${money(supplySpend(sid))}</b><span>Spent on stock</span></div><div class="stat"><b class="${sales - supplySpend(sid) >= 0 ? 'pos' : 'neg'}">${money(sales - supplySpend(sid), true)}</b><span>Profit so far</span></div>` : ''}${T.tips ? `<div class="stat"><b>${money(tips)}</b><span>Tips earned</span></div>` : ''}<div class="stat"><b>${money(sharePrice(sid))}</b><span>Share price · ${sharesOut(sid)} of ${SHARES} owned by investors</span></div><div class="stat"><b>${orders.filter(o => o.status === 'new').length}</b><span>Orders waiting</span></div></div>
+    <div class="stats"><div class="stat"><b>${money(sales)}</b><span>Total sales</span></div>${t === 'farm' ? `<div class="stat"><b>${money(S.tx.filter(x => x.kind === 'supply' && x.supplierShopId === sid).reduce((a, x) => a + x.amount, 0))}</b><span>Ingredients sold to restaurants</span></div>` : ''}${T.cogs ? `<div class="stat"><b>${money(supplySpend(sid))}</b><span>Cost of goods</span></div><div class="stat"><b class="${sales - supplySpend(sid) >= 0 ? 'pos' : 'neg'}">${money(sales - supplySpend(sid), true)}</b><span>Profit so far</span></div>` : ''}${T.tips ? `<div class="stat"><b>${money(tips)}</b><span>Tips earned</span></div>` : ''}<div class="stat"><b>${money(sharePrice(sid))}</b><span>Share price · ${sharesOut(sid)} of ${SHARES} owned by investors</span></div><div class="stat"><b>${orders.filter(o => o.status === 'new').length}</b><span>Orders waiting</span></div></div>
     ${(() => { const n = inspNotice(shop); return n ? `<div class="alert ${n.cls === 'bad' ? 'bad' : n.cls === 'note' ? 'news' : ''}"><span><b>${n.short === 'Today' || n.short === 'Overdue' ? '' : 'Inspection · '}${esc(n.text)}</b></span></div>` : ''; })()}
     ${isOpenBiz(shop) ? '' : `<div class="alert bad"><span><b>${closedWhy(shop)}.</b> Customers can’t buy anything until ${failedInsp(shop) ? 'it earns a C or better on re-inspection' + (shop.inspection?.nextDue ? ' (Day ' + shop.inspection.nextDue + ')' : '') : 'the license is renewed'}.</span></div>`}
     <div class="cols even"><div class="stack">
@@ -1512,6 +1513,7 @@ function manageBiz(shop) {
         ${shop.inspection?.notes ? `<p class="muted" style="font-size:.88rem">Inspector’s notes: ${esc(shop.inspection.notes)}</p>` : ''}
         ${shop.inspection?.kindName ? `<p style="font-size:.9rem">Last inspection: <b>${esc(shop.inspection.kindName)}</b>${shop.inspection.surprise ? ' (surprise)' : ''} on Day ${shop.inspection.day} · Grade ${shop.inspection.grade}${shop.inspection.missed?.length ? ' · needs work: ' + esc(shop.inspection.missed.join(', ').toLowerCase()) : ' · perfect score'}</p>` : ''}
         <p class="muted" style="font-size:.85rem">Inspections you could get: ${inspTypesFor(t).map(k => INSPECTIONS[k].name.toLowerCase()).join(', ')}. The inspector can also show up by surprise at any time. Better grades raise your share price. A D or F shuts you down and puts you in the newspaper.</p></section>`}
+      ${T.cogs ? `<section class="panel"><h3>Costs</h3><p class="muted" style="font-size:.9rem">Every sale automatically pays ${cfg('wholesalePct')}% of the item’s regular price for ${t === 'restaurant' ? 'ingredients' : 'goods'}${t === 'restaurant' ? `, bought from a local farm stand at ${cfg('farmDiscount')}% off when one is open` : ''}. The rest is your profit. Sales discounts come out of your profit, so price carefully!</p></section>` : ''}
       <section class="panel"><div class="panel-head"><h3>Sales & promotions</h3>${pct ? `<span class="pill bad">${pct}% off · ${saleWhen(shop)}</span>` : ''}</div>
         ${pct ? `<p class="muted">Everything is ${pct}% off on Main Street ${saleWhen(shop)}.</p><div><button class="btn ghost sm" data-act="endSale" data-id="${sid}">End the sale</button></div>`
         : `<p class="muted">Run a sale to bring in customers. Everything on your ${T.list.toLowerCase()} gets cheaper and Main Street shows it off.</p>
@@ -1755,7 +1757,7 @@ function bankView() {
         <label>New town jobs each day<input id="st-gigs" type="number" min="0" max="16" value="${Math.round(cfg('gigsPerDay'))}"></label></div></section>
       <section class="panel"><h3>Business rules</h3>
         ${Object.keys(BIZ).map(t => `<div class="fields"><label>${BIZ[t].Noun}: cost to open<input id="bc-${t}" inputmode="decimal" value="${(bizCost(t) / 100).toFixed(2)}"></label><label>Inspect every (days)<input id="br-i-${t}" type="number" min="1" value="${bizRule(t, 'inspect')}"></label><label>License lasts (days)<input id="br-l-${t}" type="number" min="1" value="${bizRule(t, 'license')}"></label></div>`).join('')}
-        <div class="fields"><label>Wholesale cost (% of selling price)<input id="st-whole" inputmode="decimal" value="${cfg('wholesalePct')}"></label><label>Most businesses one resident can run<input id="st-bizlim" type="number" min="1" max="8" value="${bizLimit()}"></label><label>License renewal (% of opening cost)<input id="st-renew" inputmode="decimal" value="${cfg('renewPct')}"></label></div></section>
+        <div class="fields"><label>Cost of goods per sale (% of price)<input id="st-whole" inputmode="decimal" value="${cfg('wholesalePct')}"></label><label>Most businesses one resident can run<input id="st-bizlim" type="number" min="1" max="8" value="${bizLimit()}"></label><label>License renewal (% of opening cost)<input id="st-renew" inputmode="decimal" value="${cfg('renewPct')}"></label></div></section>
       <section class="panel"><h3>Homes</h3><div class="fields">
         <label>Mortgage interest per period (%)<input id="st-mr" inputmode="decimal" value="${cfg('mortgageRate')}"></label>
         <label>Mortgage length (payments)<input id="st-mt" type="number" min="1" value="${every('mortgageTerm')}"></label>
@@ -1967,6 +1969,12 @@ const acts = {
     if (bal(balances(), S.me, 'c') < total) fail(`Not enough in checking. You need ${money(total)}.`);
     await addTx(S.me + '.c', acctOf(shop.ownerId), total, bizType(shop) === 'restaurant' ? 'meal' : 'purchase', `${qty} × ${it.name} at ${shop.name}` + (isHotel ? ` for the night of Day ${stay}` : '') + (pct ? ` (${pct}% off)` : '') + (tip ? ` + ${money(tip)} tip` : ''));
     if (!isHotel && it.stock != null) await db.doc('items/' + id).update({stock: it.stock - qty});
+    if (hasCogs(shop)) {
+      const farm = bizType(shop) === 'restaurant' ? pickRandom(Object.values(S.shops).filter(f => bizType(f) === 'farm' && f.ownerId !== shop.ownerId && isOpenBiz(f))) : null;
+      const cogs = qty * (farm ? Math.round(unitCost(it) * (100 - cfg('farmDiscount')) / 100) : unitCost(it));
+      if (cogs > 0 && farm) await addTx(acctOf(shop.ownerId), acctOf(farm.ownerId), cogs, 'supply', `Ingredients for ${qty} × ${it.name} from ${farm.name}`, {shopId: shop.id, supplierShopId: farm.id});
+      else if (cogs > 0) await addTx(acctOf(shop.ownerId), 'bank', cogs, 'supply', `Cost of goods: ${qty} × ${it.name}`, {shopId: shop.id});
+    }
     await db.collection('orders').add({shopId: shop.id, bizType: bizType(shop), stayDay: stay, itemId: id, itemName: it.name, qty, price: unit, salePct: pct, tip, total, buyerId: S.me, sellerId: shop.ownerId, status: 'new', day: today(), at: Date.now()});
     let stampMsg = '';
     if (shop.ownerId !== 'bank' && total >= 100) {
