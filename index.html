@@ -222,6 +222,7 @@ const FIREBASE_CONFIG = {
 <script>
 (() => {
 const app = document.getElementById('app');
+const APP_VERSION = 'Nov 8 · v42 (lottery fraud)';
 let db = null;
 const S = {
   dbState: 'loading', settings: undefined, settingsConfirmed: false,
@@ -1387,6 +1388,7 @@ function viewPick() {
     <div class="people">${tiles}
       <button class="person bank" data-act="pickBank"><span class="av">$</span>Banker<small>Grown-ups only</small></button></div>
     ${ps.length ? '' : '<div class="empty">No residents yet. The banker adds them under Residents.</div>'}
+    <p class="muted" style="font-size:.8rem;text-align:center">App version: ${APP_VERSION}</p>
   </div>`;
 }
 
@@ -2201,7 +2203,8 @@ function bankView() {
         ${hrows.map((h, i) => `<div class="fields"><label>Home<input id="hm-n-${i}" value="${esc(h.name)}" maxlength="30"></label><label>Rent<input id="hm-r-${i}" inputmode="decimal" value="${c2(h.rent)}"></label><label>Price to buy<input id="hm-p-${i}" inputmode="decimal" value="${c2(h.price)}"></label></div>`).join('')}</section>
       <section class="panel"><h3>Utility bill</h3><p class="muted" style="font-size:.88rem">Every resident gets this bill. Leave a name blank to drop that line.</p>
         ${rows.map((u, i) => `<div class="fields"><label>Utility<input id="ut-n-${i}" value="${esc(u.name)}" maxlength="24"></label><label>Amount<input id="ut-a-${i}" inputmode="decimal" value="${c2(u.amount)}"></label></div>`).join('')}</section>
-      <div><button class="btn">Save settings</button></div></form>`;
+      <div><button class="btn">Save settings</button></div>
+      <p class="muted" style="font-size:.8rem">App version: ${APP_VERSION}</p></form>`;
   }
   return '';
 }
